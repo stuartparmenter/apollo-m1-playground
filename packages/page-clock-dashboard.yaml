@@ -166,25 +166,36 @@ lvgl:
             hidden: true
             styles: [style_icon_small]
 
+script:
+  - id: update_datetime_label
+    then:
+      - lvgl.label.update:
+          id: datetime
+          text: !lambda |-
+            auto t = id(ha_time).now();
+            if (!t.is_valid()) return "";
+            int hour12 = t.hour % 12; if (hour12 == 0) hour12 = 12;
+            static char day[8];
+            static char buf[24];
+            t.strftime(day, sizeof(day), "%a");
+            snprintf(buf, sizeof(buf), "%s %d:%02d", day, hour12, t.minute);
+            return buf;
+
 # -------- Time (updates every minute) --------
 time:
   - platform: homeassistant
     id: ha_time
+    # Fires when HA time becomes available (and on any resync)
+    on_time_sync:
+      then:
+        - script.execute: update_datetime_label
+
+    # Update every minute
     on_time:
       - seconds: 0
         minutes: /1
         then:
-          - lvgl.label.update:
-              id: datetime
-              text: !lambda |-
-                auto t = id(ha_time).now();
-                if (!t.is_valid()) return "";
-                int hour12 = t.hour % 12; if (hour12 == 0) hour12 = 12;
-                static char day[8];
-                static char buf[24];
-                t.strftime(day, sizeof(day), "%a");
-                snprintf(buf, sizeof(buf), "%s %d:%02d", day, hour12, t.minute);
-                return buf;
+          - script.execute: update_datetime_label
 
 # -------- Sensors --------
 sensor:
