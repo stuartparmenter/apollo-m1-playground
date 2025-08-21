@@ -1,0 +1,64 @@
+# © Copyright 2025 Stuart Parmenter
+# SPDX-License-Identifier: MIT
+
+esp32:
+  board: esp32-s3-devkitm-1
+  flash_size: 8MB
+  framework:
+    type: esp-idf
+
+# can't currently use psram on board due to pin conflicts between hub75 controller and psram
+#psram:
+#  mode: octal
+#  speed: 80MHz
+
+external_components:
+  - source: github://stuartparmenter/ESPHome-HUB75-MatrixDisplayWrapper@use-official-library
+
+display:
+  - platform: hub75_matrix_display
+    id: matrix
+    width: ${DISPLAY_W}
+    height: ${DISPLAY_H}
+    chain_length: ${DISPLAY_CHAIN_LEN}
+    clock_phase: false # fixes off by 1 issue
+    latch_blanking: 1
+    i2sspeed: HZ_10M
+    
+    # MatrixPortal S3 specific pin mappings
+    R1_pin: 42
+    G1_pin: 41
+    B1_pin: 40
+    R2_pin: 38
+    G2_pin: 39
+    B2_pin: 37
+    A_pin: 45
+    B_pin: 36
+    C_pin: 48
+    D_pin: 35
+    E_pin: 21
+    LAT_pin: 47
+    OE_pin: 14
+    CLK_pin: 2
+
+    # for LVGL
+    double_buffer: false
+    auto_clear_enabled: false
+    update_interval: never
+
+switch:
+  - platform: hub75_matrix_display
+    matrix_id: matrix
+    name: "Power"
+    restore_mode: ALWAYS_ON
+    id: power
+
+number:
+  - platform: hub75_matrix_display
+    matrix_id: matrix
+    name: "Brightness"
+
+lvgl:
+  buffer_size: 100%
+  displays:
+    - matrix

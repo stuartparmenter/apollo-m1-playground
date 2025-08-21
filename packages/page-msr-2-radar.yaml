@@ -1,0 +1,604 @@
+# © Copyright 2025 Stuart Parmenter
+# SPDX-License-Identifier: MIT
+
+# packages/page-msr2-radar.yaml
+# LVGL radar page for Apollo MSR-2 (64x64 HUB75)
+# - Target blinks when still; stays solid when moving
+# - Bottom zone LEDs reflect HA zone occupancy
+
+substitutions:
+  # vars.yaml provides:
+  # MSR2_PREFIX: apollo_msr_2_xxxxxx
+
+  # ---- HA entity_ids
+  MOVING_DISTANCE_ENTITY:   sensor.${MSR2_PREFIX}_radar_moving_distance
+  DETECTION_DISTANCE_ENTITY: sensor.${MSR2_PREFIX}_radar_detection_distance
+  MOVE_ENERGY_ENTITY:       sensor.${MSR2_PREFIX}_radar_move_energy
+  STILL_ENERGY_ENTITY:      sensor.${MSR2_PREFIX}_radar_still_energy
+  ZONE1_OCC_ENTITY:         binary_sensor.${MSR2_PREFIX}_radar_zone_1_occupancy
+  ZONE2_OCC_ENTITY:         binary_sensor.${MSR2_PREFIX}_radar_zone_2_occupancy
+  ZONE3_OCC_ENTITY:         binary_sensor.${MSR2_PREFIX}_radar_zone_3_occupancy
+  END_ZONE1_NUM_ENTITY:     number.${MSR2_PREFIX}_radar_end_zone_1
+  END_ZONE2_NUM_ENTITY:     number.${MSR2_PREFIX}_radar_end_zone_2
+  END_ZONE3_NUM_ENTITY:     number.${MSR2_PREFIX}_radar_end_zone_3
+
+  # ---- Units (set to "1.0" if your distances are already in cm)
+  DISTANCE_TO_CM: "2.54"   # inches → cm (set to "1.0" if already cm)
+
+  # ---- Timeout / presence inference
+  TIMEOUT_S: "20"          # seconds since last presence to empty timeout bar
+  ENERGY_TRIP: "5"         # move energy threshold to consider "moving"
+
+  # ---- Colors (0xRRGGBB)
+  TERM_BG:    0x000000
+  TERM_FG:    0x00FF66
+  GRID_COLOR: 0x003300
+  LED_OFF:    0x001400
+
+  # ---- Sweep motion
+  SWEEP_MS: "60"
+  SWEEP_STEP_DEG: "6"
+  BEAM_WIDTH_DEG: "10"
+
+# ---------------- RUNTIME INPUTS ----------------
+# This is a number, but can become unknown often so we need to handle that ourselves
+text_sensor:
+  - platform: homeassistant
+    id: ts_mov
+    entity_id: ${MOVING_DISTANCE_ENTITY}
+    internal: true
+
+sensor:
+  - platform: homeassistant
+    id: s_det
+    entity_id: ${DETECTION_DISTANCE_ENTITY}
+    internal: true
+
+  - platform: homeassistant
+    id: s_move_e
+    entity_id: ${MOVE_ENERGY_ENTITY}
+    internal: true
+
+  - platform: homeassistant
+    id: s_still_e
+    entity_id: ${STILL_ENERGY_ENTITY}
+    internal: true
+
+  # End-zone bounds (cm) from HA numbers → update globals
+  - platform: homeassistant
+    id: s_end1
+    entity_id: ${END_ZONE1_NUM_ENTITY}
+    internal: true
+    on_value:
+      - lambda: |-
+          if (std::isfinite(x) && x > 0) id(g_end1_cm) = x;
+
+  - platform: homeassistant
+    id: s_end2
+    entity_id: ${END_ZONE2_NUM_ENTITY}
+    internal: true
+    on_value:
+      - lambda: |-
+          if (std::isfinite(x) && x > 0) id(g_end2_cm) = x;
+
+  - platform: homeassistant
+    id: s_end3
+    entity_id: ${END_ZONE3_NUM_ENTITY}
+    internal: true
+    on_value:
+      - lambda: |-
+          if (std::isfinite(x) && x > 0) id(g_end3_cm) = x;
+
+binary_sensor:
+  - platform: homeassistant
+    id: s_z1
+    entity_id: ${ZONE1_OCC_ENTITY}
+    internal: true
+
+  - platform: homeassistant
+    id: s_z2
+    entity_id: ${ZONE2_OCC_ENTITY}
+    internal: true
+
+  - platform: homeassistant
+    id: s_z3
+    entity_id: ${ZONE3_OCC_ENTITY}
+    internal: true
+
+# ---------------- STATE ----------------
+globals:
+  # Sweep + blink
+  - id: sweep_angle_deg
+    type: int
+    initial_value: '180'
+  - id: blink_on
+    type: bool
+    initial_value: 'true'
+
+  # Presence timeout tracking
+  - id: last_seen_ms
+    type: uint32_t
+    initial_value: '0'
+  - id: timeout_ms
+    type: int
+    initial_value: '${TIMEOUT_S}000'
+
+  # Live end-zone values (cm) — must be provided by HA at runtime
+  - id: g_end1_cm
+    type: float
+    initial_value: '0'
+  - id: g_end2_cm
+    type: float
+    initial_value: '0'
+  - id: g_end3_cm
+    type: float
+    initial_value: '0'
+
+# ---------------- LOGIC ----------------
+interval:
+  # Sweep + draw (canvas rings + sweep; ticks; LEDs; energy bars)
+  - interval: ${SWEEP_MS}ms
+    then:
+      - lambda: |-
+          static bool forward = true;
+          const int step = ${SWEEP_STEP_DEG};
+          if (forward) {
+            id(sweep_angle_deg) += step;
+            if (id(sweep_angle_deg) >= 360) { id(sweep_angle_deg) = 360; forward = false; }
+          } else {
+            id(sweep_angle_deg) -= step;
+            if (id(sweep_angle_deg) <= 180) { id(sweep_angle_deg) = 180; forward = true; }
+          }
+
+      # --- Clear canvas (transparent)
+      - lvgl.canvas.fill:
+          id: sweep_canvas
+          color: 0x000000
+          opa: 0%
+
+      # --- Grid rings (outer ring + inner rings scaled by HA end zones)
+      - lvgl.canvas.draw_arc:
+          id: sweep_canvas
+          x: 32
+          y: 31
+          radius: 31
+          start_angle: 180
+          end_angle: 360
+          color: ${GRID_COLOR}
+          width: 1
+
+      - lvgl.canvas.draw_arc:
+          id: sweep_canvas
+          x: 32
+          y: 31
+          radius: !lambda |-
+            float e2 = id(g_end2_cm);
+            float e3 = id(g_end3_cm);
+            if (e3 <= 0) return 31;  // guard until HA values arrive
+            float r = 31.0f * (e2 / e3);
+            if (r < 1.0f) r = 1.0f;
+            if (r > 30.0f) r = 30.0f;
+            return (int) roundf(r);
+          start_angle: 180
+          end_angle: 360
+          color: ${GRID_COLOR}
+          width: 1
+
+      - lvgl.canvas.draw_arc:
+          id: sweep_canvas
+          x: 32
+          y: 31
+          radius: !lambda |-
+            float e1 = id(g_end1_cm);
+            float e3 = id(g_end3_cm);
+            if (e3 <= 0) return 31;
+            float r = 31.0f * (e1 / e3);
+            if (r < 1.0f) r = 1.0f;
+            if (r > 30.0f) r = 30.0f;
+            return (int) roundf(r);
+          start_angle: 180
+          end_angle: 360
+          color: ${GRID_COLOR}
+          width: 1
+
+      # --- Highlight rings when occupied
+      - if:
+          condition:
+            lambda: 'return id(s_z1).state;'
+          then:
+            - lvgl.canvas.draw_arc:
+                id: sweep_canvas
+                x: 32
+                y: 31
+                radius: !lambda |-
+                  float e1 = id(g_end1_cm), e3 = id(g_end3_cm);
+                  if (e3 <= 0) return 31;
+                  float r = 31.0f * (e1 / e3);
+                  if (r < 1.0f) r = 1.0f;
+                  if (r > 30.0f) r = 30.0f;
+                  return (int) roundf(r);
+                start_angle: 180
+                end_angle: 360
+                color: ${TERM_FG}
+                width: 2
+      - if:
+          condition:
+            lambda: 'return id(s_z2).state;'
+          then:
+            - lvgl.canvas.draw_arc:
+                id: sweep_canvas
+                x: 32
+                y: 31
+                radius: !lambda |-
+                  float e2 = id(g_end2_cm), e3 = id(g_end3_cm);
+                  if (e3 <= 0) return 31;
+                  float r = 31.0f * (e2 / e3);
+                  if (r < 1.0f) r = 1.0f;
+                  if (r > 30.0f) r = 30.0f;
+                  return (int) roundf(r);
+                start_angle: 180
+                end_angle: 360
+                color: ${TERM_FG}
+                width: 2
+      - if:
+          condition:
+            lambda: 'return id(s_z3).state;'
+          then:
+            - lvgl.canvas.draw_arc:
+                id: sweep_canvas
+                x: 32
+                y: 31
+                radius: 31
+                start_angle: 180
+                end_angle: 360
+                color: ${TERM_FG}
+                width: 2
+
+      # --- Sweeping beam
+      - lvgl.canvas.draw_arc:
+          id: sweep_canvas
+          x: 32
+          y: 31
+          radius: 31
+          start_angle: !lambda "return id(sweep_angle_deg);"
+          end_angle: !lambda "return id(sweep_angle_deg) + ${BEAM_WIDTH_DEG};"
+          color: ${TERM_FG}
+          width: 2
+
+      - script.execute: position_target
+
+      # --- Tick marks (north of each ring); guard until HA values exist
+      - lvgl.line.update:
+          id: tick1
+          x: 32
+          y: !lambda |-
+            float e1 = id(g_end1_cm), e3 = id(g_end3_cm);
+            if (e3 <= 0) return 16;
+            int y = (int)(43 - (27.0f * e1 / e3)) - 2;
+            if (y < 16) y = 16; return y;
+          points: [ { x: 0, y: 0 }, { x: 0, y: 3 } ]
+
+      - lvgl.line.update:
+          id: tick2
+          x: 32
+          y: !lambda |-
+            float e2 = id(g_end2_cm), e3 = id(g_end3_cm);
+            if (e3 <= 0) return 16;
+            int y = (int)(43 - (27.0f * e2 / e3)) - 2;
+            if (y < 16) y = 16; return y;
+          points: [ { x: 0, y: 0 }, { x: 0, y: 3 } ]
+
+      - lvgl.line.update:
+          id: tick3
+          x: 32
+          y: !lambda |-
+            float e3 = id(g_end3_cm);
+            if (e3 <= 0) return 16;
+            int y = (int)(43 - (27.0f * e3 / e3)) - 2;  // baseline
+            if (y < 16) y = 16; return y;
+          points: [ { x: 0, y: 0 }, { x: 0, y: 3 } ]
+
+      # LEDs + energy bars refresh
+      - script.execute: update_zone_leds
+      - lvgl.bar.update: { id: move_bar }
+      - lvgl.bar.update: { id: still_bar }
+
+  # Blink + presence inference + timeout refresh
+  - interval: 240ms
+    then:
+      - lambda: |-
+          id(blink_on) = !id(blink_on);
+
+          const float TRIP   = ${ENERGY_TRIP}.0f;
+          const float SCALE  = ${DISTANCE_TO_CM};    // inches → cm if needed
+          const float MAX_CM = id(g_end3_cm);        // must come from HA
+
+          const bool any_zone = id(s_z1).state || id(s_z2).state || id(s_z3).state;
+          auto finite_pos = [](float v) { return std::isfinite(v) && v > 0.0f; };
+
+          bool dist_ok = false;
+          if (MAX_CM > 0.0f) {
+            // Prefer ts_mov, but fall back to s_det
+            if (id(ts_mov).has_state() && id(ts_mov).state != "unknown" && id(ts_mov).state != "unavailable") {
+              float mov_val = atof(id(ts_mov).state.c_str()) * SCALE;
+              if (finite_pos(mov_val) && mov_val <= MAX_CM)
+                dist_ok = true;
+            } else if (id(s_det).has_state() && finite_pos(id(s_det).state * SCALE) &&
+                      id(s_det).state * SCALE <= MAX_CM) {
+              dist_ok = true;
+            }
+          }
+
+          bool energy_ok = (id(s_move_e).has_state()  && id(s_move_e).state  >= TRIP) ||
+                           (id(s_still_e).has_state() && id(s_still_e).state >= TRIP);
+
+          if (any_zone || dist_ok || energy_ok) id(last_seen_ms) = millis();
+      - lvgl.bar.update: { id: timeout_bar }
+
+# ---------------- UI ----------------
+lvgl:
+  pages:
+    - id: radar
+      bg_color: ${TERM_BG}
+      widgets:
+        # Header
+        - label:
+            id: title
+            x: 2
+            y: 0
+            text_color: ${TERM_FG}
+            bg_color: ${TERM_BG}
+            text_font: spleen_12
+            text: "MSR2"
+
+        - label:
+            id: title2
+            x: 33
+            y: 0
+            text_color: ${TERM_FG}
+            bg_color: ${TERM_BG}
+            text_font: spleen_12
+            text: "RADAR"
+
+        # Timeout bar (thin under title)
+        - bar:
+            id: timeout_bar
+            x: 1
+            y: 10
+            width: 62
+            height: 2
+            bg_color: ${TERM_BG}
+            value: !lambda |-
+              const uint32_t now = millis();
+              const uint32_t ls  = id(last_seen_ms);
+              if (ls == 0) return 0;
+              const float elapsed = (now >= ls) ? (now - ls) : 0;
+              float pct = 100.0f * (1.0f - elapsed / (float) id(timeout_ms));
+              if (pct < 0) pct = 0;
+              if (pct > 100) pct = 100;
+              return (int)pct;
+
+        # Baseline chord (aligned with center cy=43)
+        - line:
+            id: cross_base
+            x: 0
+            y: 43
+            line_color: ${GRID_COLOR}
+            line_width: 1
+            points:
+              - { x: 0,  y: 0 }
+              - { x: 63, y: 0 }   # keep 63 to avoid scrollbars
+
+        # Radar canvas (rings + sweep)
+        - canvas:
+            id: sweep_canvas
+            x: 0
+            y: 12
+            width: 64
+            height: 32
+            transparent: true
+
+        # Target dot
+        - obj:
+            id: target_dot
+            width: 3
+            height: 3
+            bg_color: ${TERM_FG}
+            radius: 2
+            hidden: true
+
+        # Footer: tiny zone LEDs
+        - obj:
+            id: led_z1
+            x: 2
+            y: 52
+            width: 3
+            height: 3
+            radius: 0
+            border_width: 0
+            bg_color: ${LED_OFF}   # dim/off color
+            bg_opa: 100%
+        - obj:
+            id: led_z2
+            x: 8
+            y: 52
+            width: 3
+            height: 3
+            radius: 0
+            border_width: 0
+            bg_color: ${LED_OFF}
+            bg_opa: 100%
+        - obj:
+            id: led_z3
+            x: 14
+            y: 52
+            width: 3
+            height: 3
+            radius: 0
+            border_width: 0
+            bg_color: ${LED_OFF}
+            bg_opa: 100%
+
+        # Energy bars
+        - bar:
+            id: move_bar
+            x: 40
+            y: 50
+            width: 10
+            height: 5
+            bg_color: ${TERM_BG}
+            value: !lambda |-
+              return id(s_move_e).has_state() ? (int) id(s_move_e).state : 0;
+
+        - bar:
+            id: still_bar
+            x: 52
+            y: 50
+            width: 10
+            height: 5
+            bg_color: ${TERM_BG}
+            value: !lambda |-
+              return id(s_still_e).has_state() ? (int) id(s_still_e).state : 0;
+
+        # Tick marks (north of each ring; y updated each sweep)
+        - line:
+            id: tick1
+            x: 32
+            y: 16
+            line_color: ${TERM_FG}
+            line_width: 1
+            points: [ { x: 0, y: 0 }, { x: 0, y: 3 } ]
+
+        - line:
+            id: tick2
+            x: 32
+            y: 16
+            line_color: ${TERM_FG}
+            line_width: 1
+            points: [ { x: 0, y: 0 }, { x: 0, y: 3 } ]
+
+        - line:
+            id: tick3
+            x: 32
+            y: 16
+            line_color: ${TERM_FG}
+            line_width: 1
+            points: [ { x: 0, y: 0 }, { x: 0, y: 3 } ]
+
+# ---------------- SCRIPTS ----------------
+script:
+  # Update tiny zone LED squares (use LVGL actions so styles reliably apply)
+  - id: update_zone_leds
+    then:
+      # Zone 1
+      - if:
+          condition:
+            lambda: 'return id(s_z1).state;'
+          then:
+            - lvgl.widget.update:
+                id: led_z1
+                bg_color: ${TERM_FG}
+                bg_opa: 100%
+          else:
+            - lvgl.widget.update:
+                id: led_z1
+                bg_color: ${LED_OFF}
+                bg_opa: 100%   # or 0% if you want it invisible
+
+      # Zone 2
+      - if:
+          condition:
+            lambda: 'return id(s_z2).state;'
+          then:
+            - lvgl.widget.update:
+                id: led_z2
+                bg_color: ${TERM_FG}
+                bg_opa: 100%
+          else:
+            - lvgl.widget.update:
+                id: led_z2
+                bg_color: ${LED_OFF}
+                bg_opa: 100%
+
+      # Zone 3
+      - if:
+          condition:
+            lambda: 'return id(s_z3).state;'
+          then:
+            - lvgl.widget.update:
+                id: led_z3
+                bg_color: ${TERM_FG}
+                bg_opa: 100%
+          else:
+            - lvgl.widget.update:
+                id: led_z3
+                bg_color: ${LED_OFF}
+                bg_opa: 100%
+
+  # Position target; clamp above baseline; convert units
+  - id: position_target
+    then:
+      - lambda: |-
+          // Dome geometry for 64x64: canvas at (0,12) size 64x32; center ends up at (32,43)
+          const int box_x = 0, box_y = 16, box_w = 64, box_h = 54;
+          const int cx = box_x + box_w/2;    // 32
+          const int cy = box_y + box_h/2;    // 43 (baseline)
+          const float R_outer = box_h/2.0f;  // 27
+
+          const float MAX_CM = id(g_end3_cm);     // must come from HA
+          if (!(MAX_CM > 0.0f)) {                 // guard until HA values exist
+            lv_obj_add_flag(id(target_dot), LV_OBJ_FLAG_HIDDEN);
+            return;
+          }
+
+          const float SCALE  = ${DISTANCE_TO_CM};
+          const float TRIP   = ${ENERGY_TRIP}.0f;
+
+          auto finite_pos = [](float v) { return std::isfinite(v) && v > 0.0f; };
+
+          // Prefer moving distance; fallback to detection distance
+          float dist_cm = NAN;
+          if (id(ts_mov).has_state() && 
+              id(ts_mov).state != "unknown" && 
+              id(ts_mov).state != "unavailable") {
+            float mov_val = atof(id(ts_mov).state.c_str()) * SCALE;
+            if (finite_pos(mov_val)) {
+              dist_cm = mov_val;
+            }
+          } else if (id(s_det).has_state() && finite_pos(id(s_det).state * SCALE)) {
+            dist_cm = id(s_det).state * SCALE;
+          }
+
+          if (!std::isfinite(dist_cm)) {
+            lv_obj_add_flag(id(target_dot), LV_OBJ_FLAG_HIDDEN);
+            return;
+          }
+
+          // Clamp distance and map to radius
+          if (dist_cm > MAX_CM) dist_cm = MAX_CM;
+          float r = (dist_cm / MAX_CM) * R_outer;
+          if (r > R_outer - 1.0f) r = R_outer - 1.0f;
+          if (r < 0.0f) r = 0.0f;
+          const int rr = (int) roundf(r);
+
+          // LVGL angles: 0°=right, 90°=up, 180°=left, CCW+
+          const float a = id(sweep_angle_deg) * (3.14159265f / 180.0f);
+          float x = cx + rr * cosf(a);
+          float y = cy + rr * sinf(a);
+
+          // Clamp inside dome; don't drop below baseline
+          if (x < box_x+1) x = box_x+1;
+          if (x > box_x+box_w-2) x = box_x+box_w-2;
+          if (y < box_y+1) y = box_y+1;
+          if (y > cy-1)    y = cy-1;
+
+          lv_obj_set_pos(id(target_dot), (int)(x - 1), (int)(y - 1));
+
+          // --- Blink logic: solid when moving (>= TRIP), blink when still
+          bool moving_now = (id(s_move_e).has_state() && id(s_move_e).state >= TRIP);
+          if (moving_now) {
+            lv_obj_clear_flag(id(target_dot), LV_OBJ_FLAG_HIDDEN);
+          } else {
+            if (id(blink_on)) lv_obj_clear_flag(id(target_dot), LV_OBJ_FLAG_HIDDEN);
+            else              lv_obj_add_flag(id(target_dot), LV_OBJ_FLAG_HIDDEN);
+          }

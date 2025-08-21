@@ -1,0 +1,229 @@
+# © Copyright 2025 Stuart Parmenter
+# SPDX-License-Identifier: MIT
+
+lvgl:
+  pages:
+    - id: fireplace
+      widgets:
+        - obj:
+            id: fire_layer
+            width: 100%
+            height: 100%
+
+      on_load:
+        then:
+          - lambda: |-
+              // ---- Fireplace (LVGL v8) — panel-size aware ----
+              #ifndef LV_OBJ_FLAG_DELETE_PENDING
+              #define LV_OBJ_FLAG_DELETE_PENDING LV_OBJ_FLAG_USER_1
+              #endif
+
+              typedef struct {
+                int W, H;
+                lv_obj_t* canvas;
+                lv_timer_t* tmr;
+                lv_color_t* buf;
+                uint8_t* heat;          // 0..36
+                lv_color_t palette[37];
+              } fire_ctx_t;
+
+              // Tunables (unchanged)
+              #define FEED_MIN       34
+              #define FEED_MAX       36
+              #define COOL_GRAD       0
+              #define COOL_RAND_MAX   1
+              #define STEPS_PER_FRAME 2
+              #define EMBER_RATE      3
+              #define LOG_HEIGHT      2
+              #define FPS            33   // timer period (ms) ≈30 fps
+
+              struct FireUtil {
+                static inline int clampi(int v, int lo, int hi){ if(v<lo) return lo; if(v>hi) return hi; return v; }
+
+                static void sim_step(fire_ctx_t* c) {
+                  const int W = c->W, H = c->H;
+
+                  // --- Hot full-width bottom feed (tiny center bias)
+                  for (int x = 0; x < W; ++x) {
+                    int base = FEED_MIN + lv_rand(0, FEED_MAX - FEED_MIN); // 34..36
+                    int dx = x - (W/2);
+                    if ((dx*dx) < (W*W)/18) base += 1;
+                    if (base > 36) base = 36;
+                    c->heat[(H-1)*W + x] = (uint8_t)base;
+                  }
+
+                  // --- Rare embers above the hearth (guarded for arbitrary H)
+                  if (lv_rand(0, EMBER_RATE) == 0) {
+                    int ex = (W > 2) ? lv_rand(1, W-2) : 0;
+                    int ey_min = H/2;
+                    int ey_max = (H > 10) ? (H - 10) : (H - 1);
+                    if (ey_max < ey_min) ey_min = ey_max;
+                    int ey = (ey_max >= 0) ? lv_rand(ey_min, ey_max) : 0;
+                    c->heat[ey*W + ex] = 36;
+                  }
+
+                  // --- Upward propagation with occasional big sideways jumps
+                  for (int y = 0; y < H-1; ++y) {
+                    uint8_t* row   = &c->heat[y*W];
+                    uint8_t* below = &c->heat[(y+1)*W];
+                    for (int x = 0; x < W; ++x) {
+                      int ofs = lv_rand(0, 2) - 1;     // -1..+1
+                      if (lv_rand(0, 12) == 0) {       // slightly more tongues
+                        ofs += lv_rand(-2, 2);
+                      }
+                      int sx = clampi(x + ofs, 0, W-1);
+
+                      // minimal cooling → taller plume
+                      int cool = COOL_GRAD + lv_rand(0, COOL_RAND_MAX);
+                      int v = (int)below[sx] - cool;
+                      if (v < 0) v = 0;
+                      row[x] = (uint8_t)v;
+                    }
+
+                    // quick horizontal smooth (1:2:1) to reduce speckles
+                    uint8_t left = row[0];
+                    for (int x = 1; x < W-1; ++x) {
+                      uint8_t cur = row[x];
+                      uint8_t nxt = row[x+1];
+                      row[x] = (uint8_t)((left + (cur<<1) + nxt) >> 2);
+                      left = cur;
+                    }
+                  }
+                }
+
+                static void step_and_draw(fire_ctx_t* c) {
+                  if (!c) return;
+
+                  // Multiple sim steps per frame
+                  for (int i = 0; i < STEPS_PER_FRAME; ++i) {
+                    sim_step(c);
+                  }
+
+                  // --- Draw (palette index 0..36)
+                  const int W = c->W, H = c->H;
+                  for (int y = 0; y < H; ++y) {
+                    int iy = y*W;
+                    for (int x = 0; x < W; ++x) {
+                      int idx = c->heat[iy + x];
+                      if (idx < 0) idx = 0; if (idx > 36) idx = 36;
+                      c->buf[iy + x] = c->palette[idx];
+                    }
+                  }
+
+                  // --- Slim “log” line at bottom (kept at 2 px, clamped)
+                  int log_h = LOG_HEIGHT;
+                  if (log_h > H) log_h = H;
+                  for (int yb = H - log_h; yb < H; ++yb) {
+                    if (yb < 0) continue;
+                    int iyb = yb*W;
+                    for (int x = 0; x < W; ++x) {
+                      uint8_t d = ((x ^ yb) & 3) ? 10 : 0;
+                      uint8_t r = 78 + d, g = 40 + (d>>1), b = 10;
+                      c->buf[iyb + x] = lv_color_make(r, g, b);
+                    }
+                  }
+
+                  lv_obj_invalidate(c->canvas);
+                }
+              };
+
+              lv_obj_t* root = id(fire_layer);
+              if (lv_obj_get_user_data(root) != nullptr) return;
+
+              // Use panel substitutions
+              const int W = ${DISPLAY_W};
+              const int H = ${DISPLAY_H};
+
+              // Root setup
+              lv_obj_remove_style_all(root);
+              lv_obj_set_size(root, W, H);
+              lv_obj_set_style_pad_all(root, 0, 0);
+              lv_obj_set_style_bg_color(root, lv_color_black(), 0);
+              lv_obj_set_style_bg_opa(root, LV_OPA_COVER, 0);
+              lv_obj_clear_flag(root, LV_OBJ_FLAG_SCROLLABLE);
+              lv_obj_set_scrollbar_mode(root, LV_SCROLLBAR_MODE_OFF);
+              lv_obj_align(root, LV_ALIGN_TOP_LEFT, 0, 0);
+
+              // Context + buffers
+              fire_ctx_t* ctx = (fire_ctx_t*)lv_mem_alloc(sizeof(fire_ctx_t));
+              memset(ctx, 0, sizeof(*ctx));
+              ctx->W = W; ctx->H = H;
+              ctx->buf  = (lv_color_t*)lv_mem_alloc(sizeof(lv_color_t)*W*H);
+              ctx->heat = (uint8_t*)  lv_mem_alloc(sizeof(uint8_t)*W*H);
+              memset(ctx->heat, 0, W*H);
+
+              // Palette: black → deep red → red → orange → yellow → white (37 steps)
+              auto lerp8 = [](int a, int b, float t)->uint8_t {
+                float v = a + (b - a)*t;
+                if (v < 0) v = 0; if (v > 255) v = 255;
+                return (uint8_t)v;
+              };
+              const uint8_t K[][3] = {
+                {  0,   0,   0},
+                { 35,   0,   0},
+                {180,   0,   0},
+                {255,  80,   0},
+                {255, 200,   0},
+                {255, 255, 255}
+              };
+              const int steps = 36; // indices 0..36
+              for (int i = 0; i <= steps; ++i) {
+                float u = (float)i / (float)steps;
+                const int segs = 5;
+                float s = u * segs;
+                int si = (int)s; if (si >= segs) si = segs-1;
+                float tt = s - si;
+                uint8_t r = lerp8(K[si][0], K[si+1][0], tt);
+                uint8_t g = lerp8(K[si][1], K[si+1][1], tt);
+                uint8_t b = lerp8(K[si][2], K[si+1][2], tt);
+                ctx->palette[i] = lv_color_make(r, g, b);
+              }
+
+              // Canvas
+              ctx->canvas = lv_canvas_create(root);
+              lv_canvas_set_buffer(ctx->canvas, ctx->buf, W, H, LV_IMG_CF_TRUE_COLOR);
+              lv_obj_set_size(ctx->canvas, W, H);
+              lv_obj_set_style_pad_all(ctx->canvas, 0, 0);
+              lv_obj_clear_flag(ctx->canvas, LV_OBJ_FLAG_SCROLLABLE);
+              lv_obj_set_scrollbar_mode(ctx->canvas, LV_SCROLLBAR_MODE_OFF);
+              lv_obj_align(ctx->canvas, LV_ALIGN_TOP_LEFT, 0, 0);
+
+              // First frame + timer
+              FireUtil::step_and_draw(ctx);
+              auto fire_cb = [](lv_timer_t* t) {
+                auto* c = (fire_ctx_t*)t->user_data;
+                if (!c || !c->canvas || !lv_obj_is_valid(c->canvas)) { lv_timer_del(t); return; }
+                FireUtil::step_and_draw(c);
+              };
+              ctx->tmr = lv_timer_create(fire_cb, FPS, ctx);
+
+              lv_obj_set_user_data(root, ctx);
+
+      on_unload:
+        then:
+          - lambda: |-
+              typedef struct {
+                int W, H;
+                lv_obj_t* canvas;
+                lv_timer_t* tmr;
+                lv_color_t* buf;
+                uint8_t* heat;
+                lv_color_t palette[37];
+              } fire_ctx_t;
+
+              lv_obj_t* root = id(fire_layer);
+              fire_ctx_t* ctx = (fire_ctx_t*)lv_obj_get_user_data(root);
+              if (!ctx) return;
+
+              if (ctx->tmr) { lv_timer_del(ctx->tmr); ctx->tmr = nullptr; }
+              if (ctx->canvas) {
+                if (lv_obj_is_valid(ctx->canvas) && !lv_obj_has_flag(ctx->canvas, LV_OBJ_FLAG_DELETE_PENDING)) {
+                  lv_obj_add_flag(ctx->canvas, LV_OBJ_FLAG_DELETE_PENDING);
+                  lv_obj_del_async(ctx->canvas);
+                }
+                ctx->canvas = nullptr;
+              }
+              if (ctx->buf)  { lv_mem_free(ctx->buf);  ctx->buf  = nullptr; }
+              if (ctx->heat) { lv_mem_free(ctx->heat); ctx->heat = nullptr; }
+              lv_mem_free(ctx);
+              lv_obj_set_user_data(root, nullptr);

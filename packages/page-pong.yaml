@@ -1,0 +1,435 @@
+# © Copyright 2025 Stuart Parmenter
+# SPDX-License-Identifier: MIT
+
+# packages/page-pong.yaml
+# LVGL Pong with human-ish paddles:
+# - reaction delay, acceleration, speed caps
+# - jitter + small aim bias
+# - panic boost near the paddle
+# - occasional intentional miss
+# - spin based on paddle movement
+# Also: edge scoring, scoreboard (st_spleen8), serve-angle variation.
+
+substitutions:
+  PONG_PAGE_ID: "page_pong"
+  DISPLAY_H: "64"
+  PONG_BORDER: "0"
+  PONG_FG: "white"
+  PONG_BG: "black"
+
+  # sizes & timing
+  PONG_PADDLE_W: "3"
+  PONG_PADDLE_H: "12"
+  PONG_PADDLE_MARGIN_X: "2"
+  PONG_BALL_W: "4"
+  PONG_BALL_H: "4"
+  PONG_STEP_MS: "30"                 # ~33 FPS
+
+  # ball speed (base; sign set on serve)
+  PONG_BALL_SPEED_X: "1.30"
+  PONG_BALL_SPEED_Y: "0.90"
+
+  # Human-like AI knobs  (tune freely)
+  PONG_AI_L_REACT_MS: "120"          # wait before left paddle reacts
+  PONG_AI_R_REACT_MS: "80"           # wait before right paddle reacts
+  PONG_AI_L_MAX_SPEED: "2.0"         # px per tick (left)
+  PONG_AI_R_MAX_SPEED: "1.3"         # px per tick (right)
+  PONG_AI_ACCEL: "0.25"              # px/tick^2 speed ramp
+  PONG_AI_ERR_GAIN: "0.18"           # multiplier -> slight over/under-correction
+  PONG_AI_JITTER_PX: "1.2"           # random noise (± this many px)
+  PONG_AI_PANIC_ZONE: "10"           # within this many px horizontally, boost speed
+  PONG_AI_PANIC_MULT: "1.7"          # how much faster in the panic zone
+  PONG_AI_BIAS_LEFT: "-1.0"          # constant small bias (px) in tracking
+  PONG_AI_BIAS_RIGHT: "1.0"
+  PONG_AI_MISS_CHANCE: "0.06"        # 6% chance the receiver "whiffs" a serve
+
+globals:
+  - id: pong_running
+    type: bool
+    restore_value: no
+    initial_value: "false"
+
+  # Ball state
+  - id: pong_ball_x
+    type: float
+    restore_value: no
+    initial_value: "30.0"
+  - id: pong_ball_y
+    type: float
+    restore_value: no
+    initial_value: "30.0"
+  - id: pong_vx
+    type: float
+    restore_value: no
+    initial_value: ${PONG_BALL_SPEED_X}
+  - id: pong_vy
+    type: float
+    restore_value: no
+    initial_value: ${PONG_BALL_SPEED_Y}
+
+  # Paddle positions
+  - id: pong_left_y
+    type: float
+    restore_value: no
+    initial_value: "28.0"   # a little asymmetry
+  - id: pong_right_y
+    type: float
+    restore_value: no
+    initial_value: "20.0"
+
+  # Paddle velocities (for acceleration & spin)
+  - id: pong_left_vy
+    type: float
+    restore_value: no
+    initial_value: "0"
+  - id: pong_right_vy
+    type: float
+    restore_value: no
+    initial_value: "0"
+
+  # Reaction timers (ticks remaining)
+  - id: pong_left_react_ticks
+    type: int
+    restore_value: no
+    initial_value: "0"
+  - id: pong_right_react_ticks
+    type: int
+    restore_value: no
+    initial_value: "0"
+
+  # Scoring & flow
+  - id: pong_score_left
+    type: int
+    restore_value: no
+    initial_value: "0"
+  - id: pong_score_right
+    type: int
+    restore_value: no
+    initial_value: "0"
+  - id: pong_scored
+    type: bool
+    restore_value: no
+    initial_value: "false"
+  - id: pong_last_scored_right
+    type: bool
+    restore_value: no
+    initial_value: "false"
+
+  # Serve angle cycle
+  - id: pong_serve_idx
+    type: int
+    restore_value: no
+    initial_value: "0"
+
+  # PRNG state (xorshift32)
+  - id: pong_rng
+    type: int
+    restore_value: no
+    initial_value: "2463534242"
+
+  # Will this rally include an intentional miss (per receiver)?
+  - id: pong_will_miss_left
+    type: bool
+    restore_value: no
+    initial_value: "false"
+  - id: pong_will_miss_right
+    type: bool
+    restore_value: no
+    initial_value: "false"
+
+lvgl:
+  pages:
+    - id: ${PONG_PAGE_ID}
+      bg_color: ${PONG_BG}
+
+      on_load:
+        - lambda: |-
+            id(pong_score_left)  = 0;
+            id(pong_score_right) = 0;
+            id(pong_scored) = false;
+            id(pong_last_scored_right) = false;
+            id(pong_running) = true;
+        - script.execute: pong_update_score_label
+        - script.execute: pong_loop
+
+      on_unload:
+        - lambda: |-
+            id(pong_running) = false;
+        - script.stop: pong_loop
+
+      widgets:
+        - label:
+            id: pong_score
+            text: "0 - 0"
+            x: 0
+            y: 0
+            width: "100%"
+            align: top_mid
+            text_align: center
+            styles: [ st_spleen8 ]   # from styles.yaml
+            bg_opa: 0
+
+        - obj:
+            id: pong_paddle_left
+            x: ${PONG_PADDLE_MARGIN_X}
+            y: !lambda "return (int) id(pong_left_y);"
+            width: ${PONG_PADDLE_W}
+            height: ${PONG_PADDLE_H}
+            bg_color: ${PONG_FG}
+            border_width: ${PONG_BORDER}
+
+        - obj:
+            id: pong_paddle_right
+            x: !lambda "return ${DISPLAY_W} - ${PONG_PADDLE_MARGIN_X} - ${PONG_PADDLE_W};"
+            y: !lambda "return (int) id(pong_right_y);"
+            width: ${PONG_PADDLE_W}
+            height: ${PONG_PADDLE_H}
+            bg_color: ${PONG_FG}
+            border_width: ${PONG_BORDER}
+
+        - obj:
+            id: pong_ball
+            x: !lambda "return (int) id(pong_ball_x);"
+            y: !lambda "return (int) id(pong_ball_y);"
+            width: ${PONG_BALL_W}
+            height: ${PONG_BALL_H}
+            radius: 2
+            bg_color: ${PONG_FG}
+            border_width: ${PONG_BORDER}
+
+script:
+  - id: pong_update_score_label
+    mode: queued
+    then:
+      - lvgl.label.update:
+          id: pong_score
+          text: !lambda |-
+            char buf[16];
+            snprintf(buf, sizeof(buf), "%d - %d", id(pong_score_left), id(pong_score_right));
+            return std::string(buf);
+
+  - id: pong_reset
+    mode: queued
+    then:
+      - lambda: |-
+          const int W = ${DISPLAY_W};
+          const int H = ${DISPLAY_H};
+          const int BW = ${PONG_BALL_W};
+          const int BH = ${PONG_BALL_H};
+
+          // center the ball
+          id(pong_ball_x) = (W - BW) * 0.5f;
+          id(pong_ball_y) = (H - BH) * 0.5f;
+
+          // serve toward the player who conceded last point
+          float sx = ${PONG_BALL_SPEED_X};
+          id(pong_vx) = id(pong_last_scored_right) ? -fabsf(sx) : fabsf(sx);
+
+          // vary vertical speed using a small deterministic cycle
+          static const float k[] = {-1.0f, -0.6f, -0.3f, 0.3f, 0.6f, 1.0f};
+          int i = id(pong_serve_idx) % 6;
+          id(pong_serve_idx) = (id(pong_serve_idx) + 1) % 6000;
+          id(pong_vy) = ${PONG_BALL_SPEED_Y} * 0.6f * k[i];
+
+          // reset paddle dynamics
+          id(pong_left_vy) = 0;
+          id(pong_right_vy) = 0;
+
+          // set reaction timers (convert ms -> ticks)
+          auto ms_to_ticks = [&](int ms){ int t = (ms + ${PONG_STEP_MS} - 1) / ${PONG_STEP_MS}; return t < 0 ? 0 : t; };
+          id(pong_left_react_ticks)  = ms_to_ticks(${PONG_AI_L_REACT_MS});
+          id(pong_right_react_ticks) = ms_to_ticks(${PONG_AI_R_REACT_MS});
+
+          // Determine if the receiver will intentionally miss this rally
+          auto rng = [&](){ uint32_t s = (uint32_t)id(pong_rng); s ^= s<<13; s ^= s>>17; s ^= s<<5; id(pong_rng) = (int)s; return s; };
+          auto rand01 = [&](){ return (rng() & 0xFFFFFF) / 16777216.0f; };
+
+          id(pong_will_miss_left) = false;
+          id(pong_will_miss_right) = false;
+          bool to_right = (id(pong_vx) > 0);
+          float miss_p = ${PONG_AI_MISS_CHANCE};
+          if (to_right) {
+            if (rand01() < miss_p) id(pong_will_miss_right) = true;
+          } else {
+            if (rand01() < miss_p) id(pong_will_miss_left) = true;
+          }
+
+      - lvgl.widget.update:
+          id: pong_ball
+          x: !lambda "return (int) id(pong_ball_x);"
+          y: !lambda "return (int) id(pong_ball_y);"
+
+  - id: pong_step
+    mode: queued
+    then:
+      - lambda: |-
+          if (!id(pong_running)) return;
+
+          const int W = ${DISPLAY_W};
+          const int H = ${DISPLAY_H};
+          const int BW = ${PONG_BALL_W};
+          const int BH = ${PONG_BALL_H};
+          const int PW = ${PONG_PADDLE_W};
+          const int PH = ${PONG_PADDLE_H};
+          const int MARGIN = ${PONG_PADDLE_MARGIN_X};
+
+          const int left_x  = MARGIN;
+          const int right_x = W - MARGIN - PW;
+
+          // PRNG for jitter
+          auto rng = [&](){ uint32_t s = (uint32_t)id(pong_rng); s ^= s<<13; s ^= s>>17; s ^= s<<5; id(pong_rng) = (int)s; return s; };
+          auto rand01 = [&](){ return (rng() & 0xFFFFFF) / 16777216.0f; };
+          auto rand_sym = [&](){ return (rand01() * 2.0f - 1.0f); }; // [-1, 1]
+
+          // integrate ball
+          float nx = id(pong_ball_x) + id(pong_vx);
+          float ny = id(pong_ball_y) + id(pong_vy);
+
+          // top/bottom bounce
+          if (ny <= 0) { ny = 0; id(pong_vy) = -id(pong_vy); }
+          else if (ny >= (H - BH)) { ny = H - BH; id(pong_vy) = -id(pong_vy); }
+
+          float ball_center_y = ny + BH/2.0f;
+
+          // ---------- Human-ish paddle controller ----------
+          auto update_paddle = [&](bool is_left,
+                                   float &top_y, float &vy, int &react_ticks,
+                                   float bias, float max_speed_base) {
+            // Decide if ball moves toward this paddle
+            bool toward = is_left ? (id(pong_vx) < 0) : (id(pong_vx) > 0);
+
+            // Desired tracking center with tiny jitter & bias
+            float jitter = ${PONG_AI_JITTER_PX} * rand_sym();
+            float target = ball_center_y + bias + jitter;
+
+            // If ball moves away: drift toward mid slowly
+            float mid = H / 2.0f;
+            if (!toward) target = mid + bias * 0.5f;
+
+            // Reaction delay: do nothing while timer > 0
+            if (toward && react_ticks > 0) {
+              react_ticks--;
+              // light damping to settle vy
+              vy *= 0.9f;
+              top_y += vy;
+            } else {
+              // Panic boost when horizontally close
+              int px = is_left ? (int)nx : (int)(W - (nx + BW));
+              float max_speed = max_speed_base;
+              if (px <= ${PONG_AI_PANIC_ZONE}) max_speed *= ${PONG_AI_PANIC_MULT};
+
+              // Proportional-ish target with slight overshoot tendency
+              float center = top_y + (PH/2.0f);
+              float err = (target - center);
+              float desired_speed = err * ${PONG_AI_ERR_GAIN};
+
+              // Clamp desired speed
+              if (desired_speed >  max_speed) desired_speed =  max_speed;
+              if (desired_speed < -max_speed) desired_speed = -max_speed;
+
+              // Accelerate toward desired speed
+              float accel = ${PONG_AI_ACCEL};
+              if (desired_speed > vy) {
+                vy += accel;
+                if (vy > desired_speed) vy = desired_speed;
+              } else {
+                vy -= accel;
+                if (vy < desired_speed) vy = desired_speed;
+              }
+
+              top_y += vy;
+            }
+
+            // Clamp inside screen
+            if (top_y < 0) top_y = 0;
+            if (top_y > (H - PH)) top_y = H - PH;
+          };
+
+          update_paddle(true,  id(pong_left_y),  id(pong_left_vy),  id(pong_left_react_ticks),  ${PONG_AI_BIAS_LEFT},  ${PONG_AI_L_MAX_SPEED});
+          update_paddle(false, id(pong_right_y), id(pong_right_vy), id(pong_right_react_ticks), ${PONG_AI_BIAS_RIGHT}, ${PONG_AI_R_MAX_SPEED});
+
+          // Paddle-plane collisions (HIT = bounce; MISS = pass through to edge)
+          auto aabb_overlap_y = [&](float bt, float bb, float pt, float pb){
+            return (bb >= pt) && (bt <= pb);
+          };
+          float ball_top    = ny;
+          float ball_bottom = ny + BH;
+
+          // LEFT plane
+          if (nx <= (left_x + PW)) {
+            bool overlap = aabb_overlap_y(ball_top, ball_bottom, id(pong_left_y), id(pong_left_y) + PH);
+
+            // force miss if that was chosen for this rally
+            if (id(pong_will_miss_left)) overlap = false;
+
+            if (overlap) {
+              nx = left_x + PW;
+              id(pong_vx) = fabsf(${PONG_BALL_SPEED_X});
+              // add spin from paddle movement
+              float offset = ((ny + BH/2.0f) - (id(pong_left_y) + PH/2.0f)) / (PH/2.0f);
+              id(pong_vy) += 0.25f * offset + 0.35f * id(pong_left_vy);
+            }
+          }
+
+          // RIGHT plane
+          if ((nx + BW) >= right_x) {
+            bool overlap = aabb_overlap_y(ball_top, ball_bottom, id(pong_right_y), id(pong_right_y) + PH);
+
+            if (id(pong_will_miss_right)) overlap = false;
+
+            if (overlap) {
+              nx = right_x - BW;
+              id(pong_vx) = -fabsf(${PONG_BALL_SPEED_X});
+              float offset = ((ny + BH/2.0f) - (id(pong_right_y) + PH/2.0f)) / (PH/2.0f);
+              id(pong_vy) += 0.25f * offset + 0.35f * id(pong_right_vy);
+            }
+          }
+
+          // ---------- EDGE SCORING ----------
+          if (nx <= 0) {
+            id(pong_score_right)++;
+            id(pong_last_scored_right) = true;
+            id(pong_scored) = true;
+          } else if ((nx + BW) >= W) {
+            id(pong_score_left)++;
+            id(pong_last_scored_right) = false;
+            id(pong_scored) = true;
+          }
+
+          if (!id(pong_scored)) {
+            id(pong_ball_x) = nx;
+            id(pong_ball_y) = ny;
+          } else {
+            id(pong_vx) = 0;
+            id(pong_vy) = 0;
+          }
+
+      - lvgl.widget.update:
+          id: pong_ball
+          x: !lambda "return (int) id(pong_ball_x);"
+          y: !lambda "return (int) id(pong_ball_y);"
+      - lvgl.widget.update:
+          id: pong_paddle_left
+          y: !lambda "return (int) id(pong_left_y);"
+      - lvgl.widget.update:
+          id: pong_paddle_right
+          y: !lambda "return (int) id(pong_right_y);"
+
+      - if:
+          condition:
+            lambda: 'return id(pong_scored);'
+          then:
+            - script.execute: pong_update_score_label
+            - delay: 300ms
+            - script.execute: pong_reset
+            - lambda: 'id(pong_scored) = false;'
+
+  - id: pong_loop
+    mode: restart
+    then:
+      - while:
+          condition:
+            lambda: 'return id(pong_running);'
+          then:
+            - script.execute: pong_step
+            - delay: ${PONG_STEP_MS}ms

@@ -1,0 +1,32 @@
+# © Copyright 2025 Stuart Parmenter
+# SPDX-License-Identifier: MIT
+
+# Share styles used between various packages
+
+font:
+  - file: "fonts/spleen-5x8.bdf"
+    id: spleen_8
+    size: 8
+
+  - file: "fonts/spleen-6x12.bdf"
+    id: spleen_12
+    size: 12
+
+  - file: "fonts/spleen-8x16.bdf"
+    id: spleen_16
+    size: 16
+
+lvgl:
+  style_definitions:
+    - id: style_bg_black
+      bg_color: black
+      text_color: white
+    - id: st_spleen8
+      text_font: spleen_8
+      text_color: white
+    - id: st_spleen12
+      text_font: spleen_12
+      text_color: white
+    - id: st_spleen16
+      text_font: spleen_16
+      text_color: white

@@ -1,0 +1,100 @@
+# © Copyright 2025 Stuart Parmenter
+# SPDX-License-Identifier: MIT
+
+esphome:
+  includes:
+    - src/page_bios.h
+
+wifi:
+  on_connect:
+    then:
+      - lvgl.label.update:
+          id: boot_status
+          text: "WiFi OK"
+      - delay: 1s
+
+api:
+  on_client_connected:
+    then:
+      - component.suspend: boot_check
+      - lvgl.label.update:
+          id: boot_status
+          text: "API OK"
+      - delay: 1s
+      - lvgl.label.update:
+          id: boot_status
+          text: "*Ready*"
+      - delay: 2s
+      - lvgl.obj.update:
+          id: boot_overlay
+          hidden: true
+
+interval:
+  - interval: 500ms
+    startup_delay: 1s
+    then:
+      - if:
+          condition:
+            wifi.connected:
+          then:
+            - lvgl.label.update:
+                id: boot_status
+                text: "API..."
+          else:
+            - lvgl.label.update:
+                id: boot_status
+                text: "WiFi..."
+    id: boot_check
+
+lvgl:
+  top_layer:
+    widgets:
+      - obj:
+          id: boot_overlay
+          x: 0
+          y: 0
+          width: 100%
+          height: 100%
+          bg_opa: COVER
+          radius: 0
+          pad_all: 0
+          border_width: 0
+          styles: [style_bg_black]
+          hidden: false
+          widgets:
+            - label:
+                id: bios_title
+                x: 2
+                y: 2
+                styles: [st_spleen8]
+                text: "M1 BIOS"
+            - label:
+                id: bios_version
+                x: 2
+                y: 12
+                styles: [st_spleen8]
+                text: !lambda 'return bios_get_version();'
+            - label:
+                id: bios_cpu
+                x: 2
+                y: 22
+                styles: [st_spleen8]
+                text: !lambda 'return bios_cpu_string();'
+            - label:
+                id: bios_mem
+                x: 2
+                y: 32
+                styles: [st_spleen8]
+                text: !lambda 'return bios_mem_string();'
+            - label:
+                id: bios_id
+                x: 2
+                y: 42
+                styles: [st_spleen8]
+                text: !lambda 'return bios_id_string();'
+            - label:
+                id: boot_status
+                align: TOP_MID
+                y: 52
+                styles: [st_spleen8]
+                text: "Initializing"

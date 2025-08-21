@@ -1,0 +1,302 @@
+# © Copyright 2025 Stuart Parmenter
+# SPDX-License-Identifier: MIT
+
+# =========================
+# Clock + Weather + Home Status (64x64)
+# =========================
+substitutions:
+  # vars.yaml provides:
+  # WX_ENTITY: "weather.home"
+  # HIGH_ENTITY: "sensor.weather_today_high"
+  # LOW_ENTITY:  "sensor.weather_today_low"
+  # UNITS: "°"
+  # ALARM_ENTITY: "alarm_control_panel.example_alarm"
+  # PERSON_A: "person.person_a"
+  # PERSON_B: "person.person_b"
+  # PERSON_A_ICON: "\U000F040A"
+  # PERSON_B_ICON: "\U000F0B8F"
+
+# --- Weather icon fonts (icons only; all text uses Spleen from styles.yaml) ---
+font:
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: mdi_26
+    size: 26
+    glyphs: [
+      "\U000F0599",  # sunny
+      "\U000F0595",  # partly-cloudy
+      "\U000F0590",  # cloudy
+      "\U000F0597",  # rainy
+      "\U000F067E",  # lightning-rainy
+      "\U000F0591",  # fog
+      "\U000F0594",  # clear-night
+      "\U000F0598"   # snowy
+    ]
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: mdi_12
+    size: 12
+    glyphs: [
+      "\U000F0CCC",  # shield-lock-outline (armed_away)
+      "\U000F0CCB",  # shield-home-outline (armed_home)
+      "\U000F099C",  # shield-off-outline (disarmed)
+      "${PERSON_A_ICON}",
+      "${PERSON_B_ICON}",
+      "\U000F02DC"   # home
+    ]
+
+lvgl:
+  # Page-local styles (text uses Spleen via styles.yaml)
+  style_definitions:
+    - id: style_bg_flat
+      bg_color: 0x000000
+      bg_grad_dir: none
+      text_color: white
+      border_width: 0
+      outline_width: 0
+      radius: 0
+
+    - id: style_divider_accent
+      line_color: 0x204080
+      line_width: 1
+
+    - id: style_icon_base
+      text_font: mdi_26
+      text_color: 0xFFFFFF
+
+    - id: style_icon_small
+      text_font: mdi_12
+      text_color: 0xFFFFFF
+
+    # dimmed small text for hi/low
+    - id: style_dim_text
+      text_font: spleen_8
+      text_color: 0xA0A0A0
+
+  pages:
+    - id: page_clock_dashboard
+      bg_color: black
+      pad_all: 0
+
+      widgets:
+        # Background
+        - obj:
+            id: bg
+            x: 0
+            y: 0
+            width: 64
+            height: 64
+            clickable: false
+            styles: [style_bg_flat]
+
+        # Day + time (default empty to avoid flash)
+        - label:
+            id: datetime
+            text: ""
+            x: 1
+            y: 0
+            width: 62
+            long_mode: clip
+            styles: [st_spleen12]
+
+        # Weather icon (bigger)
+        - label:
+            id: wx_icon
+            text: ""
+            x: 2
+            y: 12
+            styles: [style_icon_base]
+
+        # Current temp (shifted left 4px)
+        - label:
+            id: wx_temp
+            text: ""
+            x: 30
+            y: 14
+            width: 32
+            long_mode: clip
+            styles: [st_spleen16]
+
+        # Hi/Low (dimmed, under temp, left 4px, tighter spacing)
+        - label:
+            id: wx_hilo
+            text: ""
+            x: 30
+            y: 29
+            width: 32
+            long_mode: clip
+            styles: [style_dim_text]
+
+        # Divider
+        - line:
+            id: divider
+            x: 2
+            y: 40
+            points: ["0,0", "60,0"]
+            styles: [style_divider_accent]
+
+        # Bottom-row status icons (raised + re-spaced)
+        - label:
+            id: icon_alarm
+            text: "\U000F099C"
+            x: 4
+            y: 44
+            styles: [style_icon_small]
+
+        - label:
+            id: icon_a
+            text: ${PERSON_A_ICON}
+            x: 19
+            y: 44
+            hidden: true
+            styles: [style_icon_small]
+
+        - label:
+            id: icon_b
+            text: ${PERSON_B_ICON}
+            x: 34
+            y: 44
+            hidden: true
+            styles: [style_icon_small]
+
+        # placeholder
+        - label:
+            id: icon_home
+            text: ""
+            x: 49
+            y: 44
+            hidden: true
+            styles: [style_icon_small]
+
+# -------- Time (updates every minute) --------
+time:
+  - platform: homeassistant
+    id: ha_time
+    on_time:
+      - seconds: 0
+        minutes: /1
+        then:
+          - lvgl.label.update:
+              id: datetime
+              text: !lambda |-
+                auto t = id(ha_time).now();
+                if (!t.is_valid()) return "";
+                int hour12 = t.hour % 12; if (hour12 == 0) hour12 = 12;
+                static char day[8];
+                static char buf[24];
+                t.strftime(day, sizeof(day), "%a");
+                snprintf(buf, sizeof(buf), "%s %d:%02d", day, hour12, t.minute);
+                return buf;
+
+# -------- Sensors --------
+sensor:
+  # Current temperature
+  - platform: homeassistant
+    id: wx_temp_now
+    entity_id: ${WX_ENTITY}
+    attribute: temperature
+    accuracy_decimals: 0
+    on_value:
+      - lvgl.label.update:
+          id: wx_temp
+          text: !lambda |-
+            if (isnan(id(wx_temp_now).state)) return "";
+            static char buf[12];
+            snprintf(buf, sizeof(buf), "%d%s", (int) id(wx_temp_now).state, "${UNITS}");
+            return buf;
+
+  # Today's High
+  - platform: homeassistant
+    id: wx_today_high
+    entity_id: ${HIGH_ENTITY}
+    accuracy_decimals: 0
+    on_value:
+      - lvgl.label.update:
+          id: wx_hilo
+          text: !lambda |-
+            if (isnan(id(wx_today_high).state) || isnan(id(wx_today_low).state)) return "";
+            static char buf[10];
+            snprintf(buf, sizeof(buf), "%d-%d",
+                     (int) id(wx_today_low).state,
+                     (int) id(wx_today_high).state);
+            return buf;
+
+  # Today's Low
+  - platform: homeassistant
+    id: wx_today_low
+    entity_id: ${LOW_ENTITY}
+    accuracy_decimals: 0
+    on_value:
+      - lvgl.label.update:
+          id: wx_hilo
+          text: !lambda |-
+            if (isnan(id(wx_today_high).state) || isnan(id(wx_today_low).state)) return "";
+            static char buf[10];
+            snprintf(buf, sizeof(buf), "%d-%d",
+                     (int) id(wx_today_low).state,
+                     (int) id(wx_today_high).state);
+            return buf;
+
+# -------- Condition (icon + color) --------
+text_sensor:
+  - platform: homeassistant
+    id: wx_condition
+    entity_id: ${WX_ENTITY}
+    on_value:
+      # Set the glyph
+      - lvgl.label.update:
+          id: wx_icon
+          text: !lambda |-
+            auto s = id(wx_condition).state;
+            if (s == "sunny" || s == "clear") return "\U000F0599";
+            if (s == "partlycloudy" || s == "partly-cloudy") return "\U000F0595";
+            if (s == "cloudy") return "\U000F0590";
+            if (s == "rainy" || s == "rain" || s == "showers" || s == "drizzle") return "\U000F0597";
+            if (s == "lightning-rainy" || s == "thunderstorm") return "\U000F067E";
+            if (s == "fog" || s == "mist" || s == "haze" || s == "smoke") return "\U000F0591";
+            if (s == "snowy" || s == "snow") return "\U000F0598";
+            if (s == "clear-night" || s == "night") return "\U000F0594";
+            return "\U000F0595";  // default partly-cloudy
+
+      # Color by condition
+      - lvgl.widget.update:
+          id: wx_icon
+          text_color: !lambda |-
+            auto s = id(wx_condition).state;
+            if (s == "sunny" || s == "clear") return lv_color_hex(0xFFC107);
+            if (s == "partlycloudy" || s == "partly-cloudy" || s == "cloudy") return lv_color_hex(0x90A4AE);
+            if (s == "rainy" || s == "rain" || s == "showers" || s == "drizzle") return lv_color_hex(0x42A5F5);
+            if (s == "lightning-rainy" || s == "thunderstorm") return lv_color_hex(0xFF7043);
+            if (s == "fog" || s == "mist" || s == "haze" || s == "smoke") return lv_color_hex(0xB0BEC5);
+            if (s == "snowy" || s == "snow") return lv_color_hex(0xB3E5FC);
+            if (s == "clear-night" || s == "night") return lv_color_hex(0x90CAF9);
+            return lv_color_hex(0x90A4AE);
+
+  - platform: homeassistant
+    id: alarm_state
+    entity_id: ${ALARM_ENTITY}
+    on_value:
+      - lvgl.label.update:
+          id: icon_alarm
+          text: !lambda |-
+            auto s = id(alarm_state).state;
+            if (s == "armed_away")   return "\U000F0CCC";  // lock
+            if (s == "armed_home")   return "\U000F0CCB";  // home
+            if (s == "disarmed")     return "\U000F099C";  // off
+            return "\U000F099C";  // default → disarmed
+
+  - platform: homeassistant
+    id: person_a
+    entity_id: ${PERSON_A}
+    on_value:
+      - lvgl.label.update:
+          id: icon_a
+          hidden: !lambda |-
+            return id(person_a).state == "home" ? false : true;
+
+  - platform: homeassistant
+    id: person_b
+    entity_id: ${PERSON_B}
+    on_value:
+      - lvgl.widget.update:
+          id: icon_b
+          hidden: !lambda |-
+            return id(person_b).state == "home" ? false : true;

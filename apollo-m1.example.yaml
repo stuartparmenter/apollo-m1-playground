@@ -1,0 +1,96 @@
+# apollo-m1.example.yaml
+# Template config for Apollo M-1 (rev1)
+# Copy this file to apollo-m1.yaml (gitignored) and edit locally.
+# Comment out page includes below to disable pages for your build.
+
+packages:
+  # Includes your substitution values
+  - !include vars.yaml
+
+  # Base board/pins, LVGL root, services, etc.
+  - !include packages/apollo-m1-base.yaml
+
+  # Shared fonts and LVGL styles
+  - !include styles.yaml
+
+  # Pages (comment out to disable)
+  - !include packages/page-bios.yaml
+  - !include packages/page-weather-clock.yaml
+  - !include packages/page-fireworks.yaml
+  - !include packages/page-fireplace.yaml
+  - !include packages/page-pong.yaml
+  - !include packages/page-msr-2-radar.yaml
+  - !include packages/page-ddp-stream.yaml
+
+# Device identity (safe defaults; edit locally as you like)
+esphome:
+  name: apollo-m-1
+  friendly_name: Apollo M-1
+  name_add_mac_suffix: true
+
+# Logging
+# logger:
+#   level: DEBUG
+
+# API (native API, not Matter); generate/store your key in secrets.yaml
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+# OTA updates (ESPHome OTA). Store password in secrets.yaml
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+# Wi-Fi credentials (or move to Ethernet if your board supports it)
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  # Optional: uncomment if you need a static IP
+  # manual_ip:
+  #   static_ip: 192.168.1.50
+  #   gateway: 192.168.1.1
+  #   subnet: 255.255.255.0
+
+
+# Optional helpers/sensors/etc
+# Helper Scripts
+script:
+  - id: lvgl_next_page
+    then:
+      - lvgl.page.next:
+          animation: MOVE_LEFT
+          time: 200ms
+
+  - id: lvgl_prev_page
+    then:
+      - lvgl.page.previous:
+          animation: MOVE_RIGHT
+          time: 200ms
+
+# Home Assistant–exposed buttons that call those scripts
+button:
+  - platform: template
+    name: "LVGL Next Page"
+    icon: "mdi:page-next"
+    on_press:
+      - script.execute: lvgl_next_page
+
+  - platform: template
+    name: "LVGL Previous Page"
+    icon: "mdi:page-previous"
+    on_press:
+      - script.execute: lvgl_prev_page
+
+# Memory reporting sensor
+sensor:
+  - platform: template
+    name: "Free Heap"
+    device_class: data_size
+    state_class: measurement
+    unit_of_measurement: "B"
+    update_interval: 5s
+    lambda: |-
+      #include "esp_system.h"
+      // Bytes of free 8-bit capable heap (all allocatable heap)
+      return (float) esp_get_free_heap_size();

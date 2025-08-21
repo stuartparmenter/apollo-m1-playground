@@ -1,0 +1,16 @@
+# Gitignore settings for ESPHome
+# This is an example and may include too much for your use-case.
+# You can modify this file to suit your needs.
+.pio/
+.pioenvs/
+.esphome/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.env
+apollo-m1.yaml
+secrets.yaml
+vars.yaml
+.DS_Store
+Thumbs.db
