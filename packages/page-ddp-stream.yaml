@@ -17,45 +17,40 @@ substitutions:
   OUT_ID: "1"
 
 external_components:
-  - source: github://stuartparmenter/lvgl-ddp-stream@v0.1.0
+  - source: github://stuartparmenter/lvgl-ddp-stream@v0.2.0
     components: [ddp_stream, ws_ddp_control]
 
-# -----------------------------
-# DDP receiver + canvas binding
-# -----------------------------
+# UDP DDP sink + canvas bindings (no w/h required here)
 ddp_stream:
   id: ddp
   port: ${DDP_PORT}
   streams:
     - id: ${OUT_ID}
       canvas_id: "canvas64"
-      width: ${CANVAS_WIDTH}
-      height: ${CANVAS_HEIGHT}
+    # - id: 2
+    #   canvas_id: "canvas32"
 
 # -----------------------------
 # WebSocket control
 # -----------------------------
 ws_ddp_control:
-  - id: ws
-    ws_host: ${WS_DDP_HOST}
-    ws_port: ${WS_DDP_PORT}
-    width: ${CANVAS_WIDTH}
-    height: ${CANVAS_HEIGHT}
-    out: ${OUT_ID}
-    src: ${DEFAULT_VIDEO_SRC}
-    # Optional parameters:
-    # pace: <int>         # e.g. 30 (frames/sec). 0 disables pacing
-    # ema: <float>        # 0.0–1.0, smoothing factor for low-FPS sources
-    # expand: auto        # values: 0|never, 1|auto, 2|force
-    # loop: true          # true|false, repeat source
-    # ddp_port: 4048      # UDP port for DDP packets
-    # hw: auto            # auto|none|cuda|qsv|vaapi|videotoolbox|d3d11va (server-specific)
-
-globals:
-  - id: ddp_page_active
-    type: bool
-    restore_value: no
-    initial_value: 'false'
+  id: ws
+  ws_host: ${WS_DDP_HOST}
+  ws_port: ${WS_DDP_PORT}
+  ddp: ddp
+  outputs:
+    - id: 1
+      src: ${DEFAULT_VIDEO_SRC}
+      # width/height optional; if omitted, auto from canvas
+      # width: 64
+      # height: 64
+      # pace: 20
+      # ema: 0.0
+      # expand: auto
+      # loop: true
+      # hw: auto
+    # - id: 2
+    #   src: ${VIDEO_SRC_2}
 
 # -----------------------------
 # LVGL page with a single canvas
@@ -71,13 +66,13 @@ lvgl:
       on_load:
         then:
           - lambda: |-
-              id(ddp_page_active) = true;
-              id(ws).start();
+              id(ws).connect();
+              id(ws).start(${OUT_ID});
       on_unload:
         then:
           - lambda: |-
-              id(ddp_page_active) = false;
-              id(ws).stop();
+              id(ws).stop(${OUT_ID});
+              id(ws).disconnect();
 
 # -----------------------------
 # Runtime source change
@@ -92,8 +87,4 @@ text:
     on_value:
       then:
         - lambda: |-
-            id(ws).set_src(x.c_str());
-            // Only restart if page is visible
-            if (id(ddp_page_active)) {
-              id(ws).request_restart();
-            }
+            id(ws).set_src(${OUT_ID}, x.c_str());
