@@ -23,7 +23,7 @@ display:
     chain_length: ${DISPLAY_CHAIN_LEN}
     clock_phase: false # fixes off by 1 issue
     latch_blanking: 1
-    i2sspeed: HZ_10M
+    i2sspeed: HZ_20M
     
     # MatrixPortal S3 specific pin mappings
     R1_pin: 42
