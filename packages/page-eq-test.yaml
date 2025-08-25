@@ -1,0 +1,372 @@
+# © Copyright 2025 Stuart Parmenter
+# SPDX-License-Identifier: MIT
+
+# =====================================================
+# 64×64 Retro Bar EQ — Mic/Synthetic Toggle Package
+# Mic runs only while the page is active; toggle between mic and synthetic
+# =====================================================
+
+# ---- I²S bus for the mic (Apollo M-1 pins) ----------
+i2s_audio:
+  i2s_lrclk_pin: GPIO6      # WS / LRCLK
+  i2s_bclk_pin:  GPIO7      # BCLK / SCK
+
+# ---- Microphone (I²S) --------------------------------
+microphone:
+  - platform: i2s_audio
+    id: m1_mic
+    adc_type: external
+    i2s_din_pin: GPIO16     # SD / DIN
+    channel: right          # use left/right as needed for your capsule
+    sample_rate: 16000
+    bits_per_sample: 32bit
+    on_data:
+      - lambda: |-
+          // 8-band Goertzel (music-ish centers) + DC blocker
+          static const float CF[8] = { 63.f, 125.f, 250.f, 500.f, 1000.f, 2000.f, 3500.f, 6000.f };
+          static float smoothed[8] = {0};
+          static float peak_hold[8] = {0};
+          static float hp_prev_x = 0.0f, hp_prev_y = 0.0f;
+          const float HP_A = 0.995f;
+          const int SR = 16000;
+
+          // If page not visible or mic not selected, ignore work early
+          if (!id(eq_page_active) || !id(eq_input_mic).state) return;
+
+          const size_t Nbytes = x.size();
+          if (Nbytes < 256) return;
+          const int Mmax = 512;
+          const int M = std::min((int)(Nbytes / 4), Mmax);
+          const int32_t *raw = reinterpret_cast<const int32_t *>(x.data());
+
+          // Try 24-in-32 scaling first (common); fall back to full 32-bit
+          auto sample_at = [&](int i)->float {
+            // pick one of these two lines if you know your mic format:
+            float s = (float)(raw[i] >> 8) / 8388608.0f;   // 24-bit left-justified in 32-bit
+            // float s = (float) raw[i]       / 2147483648.0f; // true 32-bit
+            float y = s - hp_prev_x + HP_A * hp_prev_y;    // DC block
+            hp_prev_x = s; hp_prev_y = y;
+            float w = 0.5f * (1.0f - cosf(2.0f*3.14159265f * i / (M - 1))); // Hann
+            return y * w;
+          };
+
+          for (int b = 0; b < 8; b++) {
+            float f = CF[b];
+            if (f > SR * 0.49f) f = SR * 0.49f;
+            const float kf = 0.5f + (M * f) / SR;
+            const int   k  = (int)kf;
+            const float w  = 2.0f * 3.14159265f * k / M;
+            const float cw = cosf(w), sw = sinf(w), coeff = 2.0f * cw;
+
+            float q0=0, q1=0, q2=0;
+            for (int i = 0; i < M; i++) {
+              float xn = sample_at(i);
+              q0 = coeff*q1 - q2 + xn;
+              q2 = q1; q1 = q0;
+            }
+            float real = q1 - q2 * cw;
+            float imag = q2 * sw;
+            float mag  = sqrtf(real*real + imag*imag) / (float)M;
+
+            float dbish = 20.0f * log10f(mag + 1e-7f) + 60.0f;  // compress ~0..60
+            if (dbish < 0) dbish = 0; if (dbish > 60) dbish = 60;
+
+            const float attack = 0.60f, release = 0.08f;
+            if (dbish > smoothed[b]) smoothed[b] = smoothed[b]*(1.0f-attack) + dbish*attack;
+            else                      smoothed[b] = smoothed[b]*(1.0f-release) + dbish*release;
+
+            if (smoothed[b] > peak_hold[b]) peak_hold[b] = smoothed[b];
+            else peak_hold[b] *= 0.985f;
+          }
+
+          for (int i = 0; i < 8; i++) {
+            id(eq_levels)[i] = smoothed[i];
+            id(eq_peaks)[i]  = peak_hold[i];
+          }
+
+# ---- Shared state & page-active flag ----------------
+globals:
+  - id: eq_levels
+    type: float[8]
+    restore_value: no
+    initial_value: "{0,0,0,0,0,0,0,0}"
+  - id: eq_peaks
+    type: float[8]
+    restore_value: no
+    initial_value: "{0,0,0,0,0,0,0,0}"
+  - id: eq_page_active
+    type: bool
+    restore_value: no
+    initial_value: "false"
+
+# ---- Input selector switch --------------------------
+switch:
+  - platform: template
+    name: "EQ Input: Mic"
+    id: eq_input_mic
+    restore_mode: RESTORE_DEFAULT_OFF
+    optimistic: true
+    on_turn_on:
+      - if:
+          condition:
+            lambda: 'return id(eq_page_active);'
+          then:
+            - microphone.capture: m1_mic
+    on_turn_off:
+      - microphone.stop_capture: m1_mic
+
+# ---- LVGL styles + page (no labels) -----------------
+lvgl:
+  style_definitions:
+    - id: page_bg
+      bg_color: 0x000000
+      bg_opa: COVER
+      border_width: 0
+      outline_width: 0
+      pad_all: 0
+    - id: bar_style
+      radius: 0
+      border_width: 0
+      bg_opa: COVER
+    - id: peak_style
+      radius: 0
+      border_width: 0
+      bg_opa: COVER
+
+  pages:
+    - id: page_eq
+      styles: [page_bg]
+      on_load:
+        - lambda: 'id(eq_page_active) = true;'
+        - if:
+            condition:
+              switch.is_on: eq_input_mic
+            then:
+              - microphone.capture: m1_mic
+            else:
+              - microphone.stop_capture: m1_mic
+      on_unload:
+        - lambda: 'id(eq_page_active) = false;'
+        - microphone.stop_capture: m1_mic
+      widgets:
+        # Bars
+        - obj: { id: bar0,  styles: [bar_style] }
+        - obj: { id: bar1,  styles: [bar_style] }
+        - obj: { id: bar2,  styles: [bar_style] }
+        - obj: { id: bar3,  styles: [bar_style] }
+        - obj: { id: bar4,  styles: [bar_style] }
+        - obj: { id: bar5,  styles: [bar_style] }
+        - obj: { id: bar6,  styles: [bar_style] }
+        - obj: { id: bar7,  styles: [bar_style] }
+        # Peak caps
+        - obj: { id: peak0, styles: [peak_style] }
+        - obj: { id: peak1, styles: [peak_style] }
+        - obj: { id: peak2, styles: [peak_style] }
+        - obj: { id: peak3, styles: [peak_style] }
+        - obj: { id: peak4, styles: [peak_style] }
+        - obj: { id: peak5, styles: [peak_style] }
+        - obj: { id: peak6, styles: [peak_style] }
+        - obj: { id: peak7, styles: [peak_style] }
+
+# ---- Synthetic generator (only when mic is OFF & page visible)
+interval:
+  # --- Music-like synthetic generator (no mic needed) ---
+  - interval: 100ms
+    then:
+      - lambda: |-
+          if (!(id(eq_page_active)) || id(eq_input_mic).state) return;  // only synth when page on & mic OFF
+
+          const float max_db = 60.0f;
+          const int   BPM = 120;                   // 🎵 change this for faster/slower songs
+          const int   STEPS_PER_BEAT = 60000 / (BPM * 100);   // 100ms step -> 5 at 120 BPM
+          static int  step = 0;
+
+          // --- Groove clocks ---
+          int beat_step = step % STEPS_PER_BEAT;          // 0..(SPB-1)
+          int beat_idx  = (step / STEPS_PER_BEAT) % 16;   // 0..15 (4 bars of 4/4)
+          int bar_idx   = (step / (STEPS_PER_BEAT*4)) % 8;
+
+          // --- Envelopes (fast attacks, natural decays) ---
+          static float env_kick = 0.0f;    // hits on beats 0 and 8 (1 & 3)
+          static float env_snare = 0.0f;   // hits on beats 4 and 12 (2 & 4)
+          static float env_hat = 0.0f;     // 8ths/16ths
+          static float env_bass = 0.3f;    // slow bassline movement 0..1
+          static float env_chord = 0.0f;   // bar shimmer
+
+          // Trigger kick (beats 0 & 8)
+          if ((beat_idx == 0 || beat_idx == 8) && beat_step == 0) env_kick = 1.0f;
+          // Trigger snare (beats 4 & 12)
+          if ((beat_idx == 4 || beat_idx == 12) && beat_step == 0) env_snare = 1.0f;
+          // Hats on 8ths with jitter (roughly every ~2–3 steps)
+          if ((beat_step == 0 || beat_step == (STEPS_PER_BEAT/2)) || (esp_random() % 7) == 0) env_hat = 0.8f;
+          // Chord brightness on bar downbeat
+          if ((beat_idx == 0) && beat_step == 0) env_chord = 0.9f;
+
+          // Decay envelopes
+          env_kick  *= 0.65f;
+          env_snare *= 0.70f;
+          env_hat   *= 0.55f;
+          env_chord *= 0.92f;
+
+          // Bassline: slow triangle-ish LFO that shifts focus between band0↔band1↔band2
+          {
+            static float bass_phase = 0.0f;
+            bass_phase += 0.04f; if (bass_phase > 6.283f) bass_phase -= 6.283f;
+            env_bass = 0.5f * (sinf(bass_phase) + 1.0f); // 0..1
+          }
+
+          // --- Build per-band targets (dB-ish 0..60) ---
+          // Base noise floor per band (tiny random wobble)
+          float base[8];
+          for (int i = 0; i < 8; i++) {
+            base[i] = 6.0f + (esp_random() % 400) * 0.01f; // ~6..10 dB
+          }
+
+          // Kick energy mainly in 0..2, a touch in 3
+          float kick_w[8] = {1.0f, 0.8f, 0.5f, 0.2f, 0,0,0,0};
+          // Snare energy mainly in 3..5
+          float snare_w[8]= {0,0,0.3f, 0.9f, 0.7f, 0.4f, 0.1f, 0};
+          // Hats energy in 6..7
+          float hat_w[8]  = {0,0,0,0,0, 0.1f, 0.9f, 1.0f};
+
+          // Sidechain ducking curve: dip mids/highs when kick hits
+          float side_w[8] = {0.0f, 0.0f, 0.1f, 0.5f, 0.7f, 0.8f, 0.9f, 0.9f};
+
+          // Chord shimmer boosts presence/highs a bit (bands 4..7)
+          float chord_w[8]= {0,0,0,0, 0.4f, 0.6f, 0.8f, 0.9f};
+
+          // Bassline focus among low bands 0..2
+          float bass_w[8] = {0};
+          bass_w[0] = 1.0f - env_bass;         // swings 0..1 opposite of env_bass
+          bass_w[1] = 0.2f + 0.6f*env_bass;    // rises with env_bass
+          bass_w[2] = 0.1f + 0.3f*(1.0f-env_bass);
+
+          // Per-band target level
+          float target[8];
+          for (int i = 0; i < 8; i++) {
+            float v = base[i];
+
+            // drums
+            v += env_kick * 36.0f * kick_w[i];
+            v += env_snare * 28.0f * snare_w[i];
+            v += env_hat * 14.0f * hat_w[i];
+
+            // bassline
+            v += 18.0f * bass_w[i];
+
+            // chord brightness
+            v += env_chord * 10.0f * chord_w[i];
+
+            // sidechain ducking on kick (after adds)
+            v -= env_kick * 10.0f * side_w[i];
+
+            // tiny random movement
+            v += ((int)(esp_random() & 0xFF) - 128) * 0.02f;
+
+            // clamp
+            if (v < 0) v = 0; if (v > max_db) v = max_db;
+            target[i] = v;
+          }
+
+          // Smooth to feel like audio envelopes + update peaks
+          for (int i = 0; i < 8; i++) {
+            // slightly quicker attack than release
+            float cur = id(eq_levels)[i];
+            float atk = 0.45f, rel = 0.15f;
+            float v  = target[i];
+            if (v > cur) cur = cur*(1.0f- atk) + v*atk;
+            else         cur = cur*(1.0f- rel) + v*rel;
+
+            id(eq_levels)[i] = cur;
+            if (cur > id(eq_peaks)[i]) id(eq_peaks)[i] = cur;
+            else                       id(eq_peaks)[i] *= 0.985f;
+          }
+
+          step++;
+
+# ---- Render loop (bars + peaks; 64×64 clamped) ------
+  - interval: 40ms
+    then:
+      - lambda: |-
+          static lv_obj_t* bars[8];
+          static lv_obj_t* peaks[8];
+          static bool placed = false;
+
+          const int W = 64, H = 64;
+          const int margin = 2;
+          const int gap = 2;
+          const int BARS = 8;
+          const int barW = (W - 2*margin - (BARS-1)*gap) / BARS;
+          const int usable = H - 2*margin;
+          const float max_db = 60.0f;
+
+          if (!placed) {
+            bars[0]=id(bar0); bars[1]=id(bar1); bars[2]=id(bar2); bars[3]=id(bar3);
+            bars[4]=id(bar4); bars[5]=id(bar5); bars[6]=id(bar6); bars[7]=id(bar7);
+            peaks[0]=id(peak0); peaks[1]=id(peak1); peaks[2]=id(peak2); peaks[3]=id(peak3);
+            peaks[4]=id(peak4); peaks[5]=id(peak5); peaks[6]=id(peak6); peaks[7]=id(peak7);
+
+            for (int i = 0; i < BARS; i++) {
+              int x0 = margin + i * (barW + gap);
+              if (x0 < 0) x0 = 0; if (x0 + barW > W) x0 = W - barW;
+              int base_y = H - margin - 1;
+              lv_obj_set_size(bars[i],  barW, 1);
+              lv_obj_set_pos(  bars[i], x0, base_y);
+              lv_obj_set_size(peaks[i], barW, 1);
+              lv_obj_set_pos(  peaks[i], x0, base_y);
+            }
+            placed = true;
+          }
+
+          // Bucketed colors (reduce flicker on HUB75)
+          auto bucket_from_t = [](float t)->uint8_t {
+            int b = (int)(t * 7.999f); if (b < 0) b = 0; if (b > 7) b = 7; return (uint8_t)b;
+          };
+          auto bucket_color = [](uint8_t b)->lv_color_t {
+            static const uint32_t c[8] = {
+              0x00A000, 0x20C000, 0x40E000, 0x80FF00,
+              0xC0FF00, 0xFFE000, 0xFF8000, 0xFF3000
+            };
+            return lv_color_hex(c[b]);
+          };
+          static uint8_t last_bucket[8] = {255,255,255,255,255,255,255,255};
+
+          for (int i = 0; i < BARS; i++) {
+            float v = id(eq_levels)[i];
+            float p = id(eq_peaks)[i];
+
+            int h  = (int)roundf((v / max_db) * usable);
+            if (h < 0) h = 0; if (h > usable) h = usable;
+
+            int ph = (int)roundf((p / max_db) * usable);
+            if (ph < 0) ph = 0; if (ph > usable) ph = usable;
+
+            int x0 = margin + i * (barW + gap);
+            if (x0 < 0) x0 = 0; if (x0 + barW > W) x0 = W - barW;
+
+            int y_bar  = (H - margin) - h;
+            int y_peak = (H - margin) - ph;
+            if (y_bar < 0)  y_bar  = 0;
+            if (y_peak < 0) y_peak = 0;
+
+            float t = usable ? (float)h / (float)usable : 0.0f;
+            uint8_t bkt = bucket_from_t(t);
+            if (bkt != last_bucket[i]) {
+              last_bucket[i] = bkt;
+              lv_obj_set_style_bg_color(bars[i], bucket_color(bkt), LV_PART_MAIN);
+            }
+
+            lv_obj_set_size(bars[i], barW, h > 0 ? h : 1);
+            lv_obj_set_pos(bars[i], x0, y_bar);
+
+            lv_obj_set_size(peaks[i], barW, 1);
+            lv_obj_set_pos(peaks[i], x0, y_peak);
+            lv_obj_set_style_bg_color(peaks[i], lv_color_hex(0xFF4000), LV_PART_MAIN);
+          }
+
+# ---- Optional: quick button to show the page --------
+button:
+  - platform: template
+    name: "Show EQ Page"
+    on_press:
+      - lvgl.page.show: page_eq
