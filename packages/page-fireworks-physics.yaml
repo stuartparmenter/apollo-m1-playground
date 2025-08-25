@@ -1,0 +1,37 @@
+# © Copyright 2025 Stuart Parmenter
+# SPDX-License-Identifier: MIT
+
+# page-fireworks-physics.yaml
+substitutions:
+  PAGE_ID: fireworks_physics_page
+  CANVAS_ID: fw_canvas
+
+esphome:
+  includes:
+    - src/page_fireworks_physics.h
+
+external_components:
+  - source:
+      type: local
+      path: /Builds/esphome_chipmunk2d/esphome/components
+    components: [chipmunk2d]
+
+chipmunk2d:
+  id: phys
+
+lvgl:
+  pages:
+    - id: fireworks_physics_page
+      widgets:
+        - canvas:
+            id: fw_canvas
+            width: 64
+            height: 64
+      on_load:
+        - lambda: |-
+            // Attach physics renderer to the canvas object
+            fireworks_physics_attach_to_canvas((lv_obj_t*) id(fw_canvas));
+      on_unload:
+        - lambda: |-
+            // Detach/cleanup (keeps your canvas object intact)
+            fireworks_physics_detach_from_canvas((lv_obj_t*) id(fw_canvas));
