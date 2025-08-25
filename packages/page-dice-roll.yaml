@@ -1,0 +1,70 @@
+# © Copyright 2025 Stuart Parmenter
+# SPDX-License-Identifier: MIT
+
+# page-dice-roll.yaml — Tossing D6 with bounce (LVGL canvas) for ESPHome (ESP‑IDF)
+# Requires: src/page_dice.h (included via esphome:includes)
+# Canvas is cleared + rendered entirely from the C++ helper. A 30fps LVGL timer is owned by the helper.
+
+esphome:
+  includes:
+    - src/page_dice.h
+
+external_components:
+  - source:
+      type: local
+      path: /Builds/esphome_chipmunk2d/esphome/components
+    components: [chipmunk2d]
+
+chipmunk2d:
+  id: phys
+  step_hz: 60
+  gravity: [0, 980]
+
+substitutions:
+  DICE_PAGE_ID: dice_canvas_page
+  CANVAS_W: "64"
+  CANVAS_H: "64"
+
+lvgl:
+  pages:
+    - id: ${DICE_PAGE_ID}
+      widgets:
+        - canvas:
+            id: dice_canvas
+            width: ${CANVAS_W}
+            height: ${CANVAS_H}
+
+      # Hook up lifecycle to our C++ helper (creates/destroys the timer)
+      on_load:
+        then:
+          - lambda: |-
+              dice_on_load(id(dice_canvas));
+
+          # optional: auto-roll once when page appears
+          - delay: 200ms
+          - lambda: |-
+              dice_roll();
+
+      on_unload:
+        then:
+          - lambda: |-
+              dice_on_unload(id(dice_canvas));
+
+# Expose a HA button to roll on demand
+button:
+  - platform: template
+    name: "Roll Dice"
+    icon: "mdi:dice-6"
+    on_press:
+      - lambda: |-
+          dice_roll();
+
+# (Optional) expose the chosen top face (the one it will settle on)
+sensor:
+  - platform: template
+    name: "Dice Target Face"
+    id: dice_target_face
+    unit_of_measurement: ""
+    update_interval: 500ms
+    lambda: |-
+      return (float) dice_current_target_top();
