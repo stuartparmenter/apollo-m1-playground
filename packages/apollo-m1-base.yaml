@@ -18,8 +18,8 @@ external_components:
 display:
   - platform: hub75_matrix_display
     id: matrix
-    width: ${DISPLAY_W}
-    height: ${DISPLAY_H}
+    width: ${PANEL_W}
+    height: ${PANEL_H}
     chain_length: ${DISPLAY_CHAIN_LEN}
     clock_phase: false # fixes off by 1 issue
     latch_blanking: 1

@@ -1,8 +1,10 @@
 substitutions:
   # ===== Display / Panel (shared) =====
-  DISPLAY_W: "64"
-  DISPLAY_H: "64"
-  DISPLAY_CHAIN_LEN: "1"
+  PANEL_W: "64"
+  PANEL_H: "64"
+  DISPLAY_CHAIN_LEN: "1" # Total number of panels you have connected
+  DISPLAY_W: "64"  # Most likely ${PANEL_W} * ${DISPLAY_CHAIN_LEN}
+  DISPLAY_H: "64"  # Most likely ${PANEL_H}
 
   # ===== Weather page (page-weather-*) =====
   WX_ENTITY: "weather.home"
