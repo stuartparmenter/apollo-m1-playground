@@ -12,7 +12,6 @@
 
 substitutions:
   PONG_PAGE_ID: "page_pong"
-  DISPLAY_H: "64"
   PONG_BORDER: "0"
   PONG_FG: "white"
   PONG_BG: "black"
