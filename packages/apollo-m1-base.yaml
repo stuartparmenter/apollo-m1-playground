@@ -32,7 +32,7 @@ display:
     #   chain_type: CHAIN_BOTTOM_RIGHT_UP   # layout mapping type
     #   scan_type: STANDARD_TWO_SCAN     # typical scan type; adjust if your panels are unusual
 
-    # MatrixPortal S3 specific pin mappings
+    # Apollo Automation M-1 Rev4 Controller specific pin mappings
     R1_pin: 42
     G1_pin: 41
     B1_pin: 40
