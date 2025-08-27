@@ -178,20 +178,42 @@ static BodyRef* spawn_particle_(Ctx* c, int x, int y, float vx, float vy,
 
 static BodyRef* spawn_rocket_(Ctx* c, int x) {
   if (!c || !c->alive || !c->space || c->stepping) return nullptr;
+
   BodyRef* br = new BodyRef();
   br->is_rocket = true;
   br->born_ms   = now_ms();
-  br->fuse_ms   = 260 + (esp_random()%220);  // earlier → mid-screen bursts
   br->px        = 1;
   br->color     = lv_color_hex(0xFFFFFF);
 
-  float vx = (float)((int)(esp_random()%31) - 15) * 0.12f;
-  float vy = - (120.0f + (esp_random()%40));
+  // --- height-aware scaling (64px baseline) ---
+  const int   H       = (int)c->H;
+  const float hscale  = (H <= 0) ? 1.0f : (H / 64.0f);
+  const float s       = sqrtf(hscale);  // height ∝ v^2 → scale v by √hscale
 
+  // Base randoms
+  // fuse: 400..619ms  → scaled by √hscale so burst timing feels similar on taller canvases
+  const uint32_t fuse_ms_base = 400u + (esp_random() % 220u);
+  br->fuse_ms = (uint32_t)((float)fuse_ms_base * s);
+
+  // horizontal drift
+  float vx = (float)((int)(esp_random() % 31) - 15) * 0.12f;
+
+  // vertical launch speed: 180..219 px/s → scale by √hscale
+  const float v0_base = 180.0f + (esp_random() % 40);
+  float v0 = v0_base * s;
+
+  // Safety clamp so apex stays on-screen even for very tall canvases:
+  // apex ≈ v^2 / (2g)
+  const float g        = GRAVITY_PX_S2;
+  const float max_apex = 0.93f * (float)H;
+  const float v0_max   = sqrtf(std::max(0.0f, 2.0f * g * max_apex));
+  v0 = std::min(v0, v0_max);
+
+  // Body
   const cpFloat m = 0.8f;
   br->body = cpBodyNew(m, INFINITY);
   cpBodySetPosition(br->body, cpv((cpFloat)x, (cpFloat)(c->H - 1)));
-  cpBodySetVelocity(br->body, cpv(vx, vy));
+  cpBodySetVelocity(br->body, cpv(vx, -v0));  // up is -Y
   cpSpaceAddBody(c->space, br->body);
 
   c->items.push_back(br);
@@ -427,79 +449,6 @@ static void create_space_(Ctx* c) {
   cpSpaceSetGravity(c->space, cpv(0, GRAVITY_PX_S2));
 }
 
-// ---------- page-layer API ----------
-static inline void on_load(lv_obj_t* layer) {
-  if (!layer) return;
-  Ctx* c = new Ctx();
-  c->layer = layer;
-
-  lv_obj_clear_flag(layer, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_scrollbar_mode(layer, LV_SCROLLBAR_MODE_OFF);
-  lv_obj_set_style_pad_all(layer, 0, LV_PART_MAIN);
-
-  c->W = (uint16_t) (lv_obj_get_content_width(layer)  ? lv_obj_get_content_width(layer)  : lv_obj_get_width(layer));
-  c->H = (uint16_t) (lv_obj_get_content_height(layer) ? lv_obj_get_content_height(layer) : lv_obj_get_height(layer));
-  if (c->W == 0) c->W = 64;
-  if (c->H == 0) c->H = 64;
-
-  c->canvas = lv_canvas_create(layer);
-  prepare_canvas_(c->canvas, c->W, c->H);
-
-  c->buf = (uint8_t*) lv_mem_alloc(c->W * c->H * 2);
-  lv_canvas_set_buffer(c->canvas, c->buf, c->W, c->H, LV_IMG_CF_TRUE_COLOR);
-  lv_canvas_fill_bg(c->canvas, lv_color_black(), LV_OPA_COVER);
-
-  lv_obj_set_user_data(layer, c);
-  lv_obj_set_user_data(c->canvas, c);
-
-  create_space_(c);
-
-  c->tick = lv_timer_create([](lv_timer_t* t){
-    Ctx* ctx = (Ctx*) t->user_data;
-    if (!ctx || !ctx->alive) return;
-    step_space_(ctx);
-    render_(ctx);
-  }, TICK_MS, c);
-
-  c->spawner = lv_timer_create([](lv_timer_t* t){
-    Ctx* ctx = (Ctx*) t->user_data;
-    if (!ctx || !ctx->alive) return;
-    spawn_loop_(ctx);
-  }, SPAWN_MS, c);
-
-  lv_obj_add_event_cb(c->canvas, [](lv_event_t* e){
-    auto* cv = (lv_obj_t*) lv_event_get_target(e);
-    auto* ctx = (Ctx*) lv_obj_get_user_data(cv);
-    if (!ctx) return;
-    ctx->alive = false;
-    if (ctx->tick)    { lv_timer_del(ctx->tick);    ctx->tick=nullptr; }
-    if (ctx->spawner) { lv_timer_del(ctx->spawner); ctx->spawner=nullptr; }
-  }, LV_EVENT_DELETE, nullptr);
-}
-
-static inline void on_unload(lv_obj_t* layer) {
-  if (!layer) return;
-  Ctx* c = (Ctx*) lv_obj_get_user_data(layer);
-  if (!c) return;
-
-  c->alive = false;
-  if (c->tick)    { lv_timer_del(c->tick);    c->tick=nullptr; }
-  if (c->spawner) { lv_timer_del(c->spawner); c->spawner=nullptr; }
-
-  clear_items_(c);
-
-  if (c->canvas && lv_obj_is_valid(c->canvas)) {
-    lv_obj_set_user_data(c->canvas, nullptr);
-    lv_obj_del_async(c->canvas);
-  }
-  if (c->buf) { lv_mem_free(c->buf); c->buf = nullptr; }
-
-  if (c->space) { cpSpaceFree(c->space); c->space = nullptr; }
-
-  lv_obj_set_user_data(layer, nullptr);
-  delete c;
-}
-
 // ---------- canvas-first API ----------
 static inline void on_canvas_attach(lv_obj_t* canvas) {
   if (!canvas || !lv_obj_is_valid(canvas)) return;
@@ -508,8 +457,6 @@ static inline void on_canvas_attach(lv_obj_t* canvas) {
   c->layer  = lv_obj_get_parent(canvas);
   c->W = (uint16_t) lv_obj_get_width(canvas);
   c->H = (uint16_t) lv_obj_get_height(canvas);
-  if (c->W == 0) c->W = 64;
-  if (c->H == 0) c->H = 64;
 
   if (c->layer && lv_obj_is_valid(c->layer)) {
     lv_obj_clear_flag(c->layer, LV_OBJ_FLAG_SCROLLABLE);
@@ -572,13 +519,6 @@ static inline void on_canvas_detach(lv_obj_t* canvas) {
 #ifdef __cplusplus
 extern "C++" {
 #endif
-// Page-layer API
-static inline void fireworks_physics_on_load(lv_obj_t* layer) {
-  fireworks_canvas_detail::on_load(layer);
-}
-static inline void fireworks_physics_on_unload(lv_obj_t* layer) {
-  fireworks_canvas_detail::on_unload(layer);
-}
 // Canvas-first API
 static inline void fireworks_physics_attach_to_canvas(lv_obj_t* canvas) {
   fireworks_canvas_detail::on_canvas_attach(canvas);
