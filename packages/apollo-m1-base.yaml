@@ -24,7 +24,14 @@ display:
     clock_phase: false # fixes off by 1 issue
     latch_blanking: 1
     i2sspeed: HZ_20M
-    
+
+    # virtual_matrix:
+    #   enabled: true
+    #   rows: 2           # number of panel rows
+    #   cols: 1           # number of panel columns
+    #   chain_type: CHAIN_BOTTOM_RIGHT_UP   # layout mapping type
+    #   scan_type: STANDARD_TWO_SCAN     # typical scan type; adjust if your panels are unusual
+
     # MatrixPortal S3 specific pin mappings
     R1_pin: 42
     G1_pin: 41
