@@ -96,7 +96,6 @@ static inline void free_body_(cpBody* b) {
 struct Ctx {
   // Canvas + buffer (owned)
   lv_obj_t*  canvas{nullptr};
-  uint8_t*   buf{nullptr};
   uint16_t   W{0}, H{0};
 
   // Single timer + debounced resize + liveness
@@ -168,7 +167,7 @@ static inline void cull_and_free_(std::vector<BodyRef*>& items, int W, int H, Ct
 }
 
 static inline void render_(Ctx* c) {
-  if (!c || !obj_alive_(c->canvas) || !c->buf || c->W == 0 || c->H == 0) return;
+  if (!c || !obj_alive_(c->canvas) || c->W == 0 || c->H == 0) return;
 
   // Trails / motion blur
   lv_canvas_fill_bg(c->canvas, lv_color_black(), c->fade_opa);
@@ -443,18 +442,13 @@ static inline void ctx_stop_timer_(Ctx* c){
   c->running = false;
 }
 
-static inline void ctx_free_canvas_buf_(Ctx* c){
-  if (!c) return;
-  if (c->buf) { lv_mem_free(c->buf); c->buf = nullptr; }
-}
-
 // Single-loop timer: mutate → step → render
 static inline void ctx_start_timer_(Ctx* c){
   if (!c || c->running) return;
 
   c->tick = lv_timer_create([](lv_timer_t* t){
     auto* c = (Ctx*) t->user_data;
-    if (!c || !c->alive || !obj_alive_(c->canvas) || !c->buf || c->W == 0 || c->H == 0 || !c->space) return;
+    if (!c || !c->alive || !obj_alive_(c->canvas) || c->W == 0 || c->H == 0 || !c->space) return;
 
     const uint32_t tnow = now_ms();
 
@@ -474,11 +468,11 @@ static inline void ctx_start_timer_(Ctx* c){
   c->running = true;
 }
 
-// Resize/start: allocate new buffer; set it; free old; recompute physics; (re)start timer
+// Resize/start: use existing ESPHome-owned canvas buffer; recompute physics; (re)start timer
 static inline void ctx_resize_start_(Ctx* c, uint16_t w, uint16_t h){
   if (!c || !obj_alive_(c->canvas) || w==0 || h==0) return;
 
-  if (c->buf && c->W == w && c->H == h) { // size unchanged
+  if (c->W == w && c->H == h) { // size unchanged
     if (!c->running) ctx_start_timer_(c);
     return;
   }
@@ -486,16 +480,12 @@ static inline void ctx_resize_start_(Ctx* c, uint16_t w, uint16_t h){
   ctx_stop_timer_(c);
   clear_items_(c);
 
-  uint8_t* newbuf = (uint8_t*) lv_mem_alloc((size_t)w * h * 2 /*RGB565*/);
-  if (!newbuf) return; // OOM: keep previous state if any
-
-  // Respect external layout; we only swap buffers
-  lv_canvas_set_buffer(c->canvas, newbuf, w, h, LV_IMG_CF_TRUE_COLOR);
+  // Ensure ESPHome's canvas has an image buffer already
+  auto img = (lv_img_dsc_t*) lv_canvas_get_img(c->canvas);
+  if (!img || !img->data) return; // nothing to draw into yet (shouldn't happen with ESPHome canvas)
+  c->W = w;
+  c->H = h;
   lv_canvas_fill_bg(c->canvas, lv_color_black(), LV_OPA_COVER);
-
-  uint8_t* old = c->buf; c->buf = newbuf;
-  c->W = w; c->H = h;
-  if (old) lv_mem_free(old);
 
   if (!c->space) create_space_(c);
 
@@ -543,7 +533,6 @@ static inline void on_canvas_attach(lv_obj_t* canvas) {
     if (c->resize_debounce) { lv_timer_del(c->resize_debounce); c->resize_debounce = nullptr; }
     if (c->tick) { lv_timer_del(c->tick); c->tick = nullptr; }
     clear_items_(c);
-    if (c->buf) { lv_mem_free(c->buf); c->buf = nullptr; }
     if (c->space) { cpSpaceFree(c->space); c->space = nullptr; }
     lv_obj_set_user_data(cv, nullptr);
     c->canvas = nullptr;
@@ -564,7 +553,6 @@ static inline void on_canvas_detach(lv_obj_t* canvas) {
   if (c->resize_debounce) { lv_timer_del(c->resize_debounce); c->resize_debounce = nullptr; }
   if (c->tick) { lv_timer_del(c->tick); c->tick = nullptr; }
   clear_items_(c);
-  if (c->buf) { lv_mem_free(c->buf); c->buf = nullptr; }
   if (c->space) { cpSpaceFree(c->space); c->space = nullptr; }
   lv_obj_set_user_data(canvas, nullptr);
   c->canvas = nullptr;
