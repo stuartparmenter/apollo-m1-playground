@@ -6,6 +6,7 @@
 #include "esp_heap_caps.h"
 #include "esp_mac.h"
 #include "esp_idf_version.h"
+#include "lvgl.h"
 
 static inline std::string bios_get_version() {
   const esp_app_desc_t* app_desc = esp_app_get_description();
@@ -56,5 +57,25 @@ static inline std::string bios_id_string() {
 
   char buf[32];
   snprintf(buf, sizeof(buf), "ID:%02X%02X%02X", mac[3], mac[4], mac[5]);
+  return std::string(buf);
+}
+
+static inline std::string bios_screen_size() {
+#if LVGL_VERSION_MAJOR >= 9
+  lv_obj_t *scr = lv_screen_active();
+  lv_display_t *disp = lv_obj_get_display(scr);
+  if (!disp) return "WxD:unknown";
+  int w = lv_display_get_horizontal_resolution(disp);
+  int h = lv_display_get_vertical_resolution(disp);
+#else
+  lv_obj_t *scr = lv_scr_act();
+  lv_disp_t *disp = lv_obj_get_disp(scr);
+  if (!disp) return "WxD:unknown";
+  int w = lv_disp_get_hor_res(disp);
+  int h = lv_disp_get_ver_res(disp);
+#endif
+
+  char buf[32];
+  std::snprintf(buf, sizeof(buf), "WxD:%dx%d", w, h);
   return std::string(buf);
 }
