@@ -15,11 +15,26 @@ packages:
 
   # Pages (comment out to disable)
   - !include packages/page-bios.yaml
+
+  # Basic weather & clock dashboard
   - !include packages/page-weather-clock.yaml
-  - !include packages/page-fireworks.yaml
+
+  # Fancy fireworks, but uses more memory
+  - !include packages/page-fireworks-physics.yaml
+
+  # Basic fireworks, less pretty
+  # - !include packages/page-fireworks.yaml
+
+  # Stay warm by the fire
   - !include packages/page-fireplace.yaml
+
+  # A classic
   - !include packages/page-pong.yaml
+
+  # Visualize your Apollo Automation MSR-2
   - !include packages/page-msr-2-radar.yaml
+
+  # DDP streaming page is memory heavy, especially with multiple panels
   - !include packages/page-ddp-stream.yaml
 
 # Device identity (safe defaults; edit locally as you like)
