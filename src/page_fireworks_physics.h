@@ -1,53 +1,35 @@
 // © Copyright 2025 Stuart Parmenter
 // SPDX-License-Identifier: MIT
-
-// Fireworks + Chipmunk2D on LVGL canvas
-// - Single-task Chipmunk stepping (LVGL timers only) → no concurrency
-// - Bodies-only integration (no shapes) → no BBTree crashes
-// - Burst patterns: peony/chrysanthemum, ring, star(5/6), palm, willow, crossette
-// - Culling only when particles actually leave the screen (with a hard TTL)
-// - Two APIs:
-//     * Page-layer: fireworks_physics_on_load(layer) / _on_unload(layer) → auto canvas
-//     * Canvas-first: fireworks_physics_attach_to_canvas(canvas) / _detach_from_canvas(canvas)
+//
+// Fireworks + Chipmunk2D on LVGL canvas (ESP-IDF, LVGL v8+)
 
 #pragma once
 
 extern "C" {
 #include <lvgl.h>
-#if !defined(LV_USE_CANVAS) || (LV_USE_CANVAS == 0)
-#  error "LVGL canvas is disabled; enable LV_USE_CANVAS in your lv_conf.h."
-#endif
 }
 
-#include <math.h>
 #include <stdint.h>
+#include <math.h>
 #include <vector>
 #include <algorithm>
-#include <esp_random.h>  // esp_random()
 
-#ifndef INFINITY
-#define INFINITY (1.0f/0.0f)
-#endif
-
-// Chipmunk headers (floats on ESP32)
-#ifndef CP_USE_DOUBLES
-#define CP_USE_DOUBLES 0
-#endif
 #include <chipmunk/chipmunk.h>
 
 namespace fireworks_canvas_detail {
 
-// ---------- tunables ----------
-static constexpr uint8_t  TRAIL_FADE_OPA     = 32;    // lower = longer trails
-static constexpr float    GRAVITY_PX_S2      = 180.0f;
-static constexpr uint32_t TICK_MS            = 33;    // ~30 FPS
-static constexpr uint32_t SPAWN_MS           = 40;
+//============================== Tunables ==============================//
 
-static constexpr int      CULL_MARGIN        = 2;     // allow slight overscan
-static constexpr uint32_t HARD_TTL_MS        = 3200;  // absolute max life
-static constexpr uint32_t SOFT_TTL_PAD_MS    = 800;   // extra beyond life_ms
+static constexpr uint8_t  TRAIL_FADE_OPA   = 32;     // lower = longer trails
+static constexpr uint32_t TICK_MS          = 33;     // ~30 FPS
+static constexpr int      CULL_MARGIN      = 2;      // overscan margin
+static constexpr uint32_t HARD_TTL_MS      = 3200;   // absolute max particle life
+static constexpr uint32_t SOFT_TTL_PAD_MS  = 800;    // extra grace beyond requested life
+static constexpr uint32_t MIN_SPAWN_GAP_MS = 300;    // min ms between core spawns
+static constexpr uint8_t  MAX_INFLIGHT     = 3;      // cap concurrent rockets
 
-// ---------- helpers ----------
+//============================== Small helpers ==============================//
+
 static inline uint32_t now_ms() { return lv_tick_get(); }
 
 static inline bool obj_alive_(lv_obj_t* o) {
@@ -59,6 +41,10 @@ static inline bool obj_alive_(lv_obj_t* o) {
   return true;
 }
 
+static inline float frand(float a, float b) {
+  return a + (b - a) * (float)(esp_random() & 0xFFFF) / 65535.0f;
+}
+
 static inline lv_color_t pick_warm() {
   static const lv_color_t WARM[] = {
     lv_color_hex(0xFFFFFF), lv_color_hex(0xFFF4CC), lv_color_hex(0xFFD27F),
@@ -67,7 +53,9 @@ static inline lv_color_t pick_warm() {
   return WARM[esp_random() % (sizeof(WARM)/sizeof(WARM[0]))];
 }
 static inline lv_color_t pick_accent() {
-  static const lv_color_t ACCENT[] = { lv_color_hex(0x00E6E6), lv_color_hex(0x8A2BE2) };
+  static const lv_color_t ACCENT[] = {
+    lv_color_hex(0x00E6E6), lv_color_hex(0x8A2BE2)
+  };
   return ACCENT[esp_random() % (sizeof(ACCENT)/sizeof(ACCENT[0]))];
 }
 static inline lv_color_t tweak(lv_color_t c) {
@@ -75,88 +63,189 @@ static inline lv_color_t tweak(lv_color_t c) {
   return lv_color_mix(lv_color_white(), c, w);
 }
 
-// ---------- data ----------
+//============================== Physics objects ==============================//
+
 struct BodyRef {
-  cpBody*   body{nullptr};
-  bool      alive{true};
-  bool      is_rocket{false};
+  cpBody*    body{nullptr};
+  bool       is_rocket{false};
+  bool       alive{true};
 
   lv_color_t color{lv_color_white()};
-  uint8_t   px{1};
-  uint32_t  born_ms{0};
-  uint32_t  fuse_ms{0};
-  uint32_t  life_ms{1000};
+  uint8_t    px{1};
+  uint32_t   born_ms{0};
+  uint32_t   life_ms{1000};
 
-  // crossette
-  bool      can_split{false};
-  bool      split_done{false};
-  uint32_t  split_ms{0};
+  // rocket-only
+  uint32_t   fuse_ms{0};
+
+  // crossette-only
+  bool       can_split{false};
+  bool       split_done{false};
+  uint32_t   split_ms{0};
 };
+
+// Free body safely (detach if in space)
+static inline void free_body_(cpBody* b) {
+  if (!b) return;
+  if (cpSpace* s = cpBodyGetSpace(b)) cpSpaceRemoveBody(s, b);
+  cpBodyFree(b);
+}
+
+//============================== Context ==============================//
 
 struct Ctx {
-  // UI
-  lv_obj_t* layer{nullptr};
-  lv_obj_t* canvas{nullptr};
-  uint8_t*  buf{nullptr};
-  uint16_t  W{64}, H{64};
+  // Canvas + buffer (owned)
+  lv_obj_t*  canvas{nullptr};
+  uint8_t*   buf{nullptr};
+  uint16_t   W{0}, H{0};
 
-  // timers
+  // Single timer + debounced resize + liveness
   lv_timer_t* tick{nullptr};
-  lv_timer_t* spawner{nullptr};
-  bool alive{true};
+  lv_timer_t* resize_debounce{nullptr};
+  bool        running{false};
+  bool        alive{true};
 
-  // physics (page-owned)
+  // Chipmunk space
   cpSpace* space{nullptr};
-  bool     stepping{false};
-  float    step_dt{1.0f/60.0f};
 
-  // objects
+  // Particles
   std::vector<BodyRef*> items;
 
-  // spawn control
+  // Spawn control (single-loop)
   uint8_t  inflight{0};
-  uint8_t  inflight_max{4};
-  uint32_t spawn_last_ms{0};
+  uint32_t last_spawn_ms{0};
 
-  // visuals
+  // Visuals
   uint8_t  fade_opa{TRAIL_FADE_OPA};
+
+  // Size-aware parameters (recomputed on resize)
+  float    grav_px_s2{180.0f};   // px/s^2
+  float    launch_vy_min{-220.0f};
+  float    launch_vy_max{-180.0f};
+  float    launch_vx_abs{15.0f};
+  uint32_t burst_t_min_ms{600};
+  uint32_t burst_t_max_ms{950};
+  float    frag_speed_min{55.0f};
+  float    frag_speed_max{85.0f};
 };
 
-// ---------- drawing ----------
+//============================== Drawing ==============================//
+
 static inline void draw_px_rect_(lv_obj_t* canvas, int x, int y, uint8_t px, lv_color_t color) {
   if (!obj_alive_(canvas)) return;
-  int W = lv_obj_get_width(canvas), H = lv_obj_get_height(canvas);
+  const int W = lv_obj_get_width(canvas), H = lv_obj_get_height(canvas);
   if (x >= W || y >= H || x + (int)px <= 0 || y + (int)px <= 0) return;
 
-  int sx = std::max(0, x), sy = std::max(0, y);
-  int ex = std::min(W, x + (int)px), ey = std::min(H, y + (int)px);
+  const int sx = (x < 0) ? 0 : x;
+  const int sy = (y < 0) ? 0 : y;
+  const int ex = std::min(W, x + (int)px);
+  const int ey = std::min(H, y + (int)px);
 
   lv_draw_rect_dsc_t d; lv_draw_rect_dsc_init(&d);
-  d.bg_color = color; d.bg_opa = LV_OPA_COVER; d.border_opa = LV_OPA_TRANSP; d.radius = 0;
+  d.bg_color   = color;
+  d.bg_opa     = LV_OPA_COVER;
+  d.border_opa = LV_OPA_TRANSP;
   lv_canvas_draw_rect(canvas, sx, sy, ex - sx, ey - sy, &d);
 }
 
-// ---------- memory ----------
-static inline void free_bodyref_(Ctx* c, BodyRef* br) {
-  if (!br) return;
-  br->alive = false;
-  if (c && c->space && br->body) {
-    cpSpaceRemoveBody(c->space, br->body);
-    cpBodyFree(br->body);
-    br->body = nullptr;
-  }
-  delete br;
-}
-static inline void clear_items_(Ctx* c) {
-  for (auto* it : c->items) free_bodyref_(c, it);
-  c->items.clear();
+static inline void cull_and_free_(std::vector<BodyRef*>& items, int W, int H, Ctx* owner = nullptr) {
+  const uint32_t t = now_ms();
+  items.erase(std::remove_if(items.begin(), items.end(), [&](BodyRef* br){
+    if (!br) return true;
+    const bool too_old = (t - br->born_ms > (br->life_ms + SOFT_TTL_PAD_MS)) ||
+                         (t - br->born_ms > HARD_TTL_MS);
+    const cpVect p = br->body ? cpBodyGetPosition(br->body) : cpv(-9999, -9999);
+    const bool oob = (p.x < -CULL_MARGIN) || (p.y < -CULL_MARGIN) ||
+                     (p.x > W + CULL_MARGIN) || (p.y > H + CULL_MARGIN);
+    if (too_old || oob || !br->alive) {
+      if (owner && br->is_rocket && owner->inflight > 0) owner->inflight--;
+      free_body_(br->body);
+      delete br;
+      return true;
+    }
+    return false;
+  }), items.end());
 }
 
-// ---------- spawners (bodies only; no shapes) ----------
-static BodyRef* spawn_particle_(Ctx* c, int x, int y, float vx, float vy,
-                                lv_color_t base, uint8_t px=1, uint32_t life_ms=1000,
-                                bool can_split=false, uint32_t split_ms=0) {
-  if (!c || !c->alive || !c->space || c->stepping) return nullptr;
+static inline void render_(Ctx* c) {
+  if (!c || !obj_alive_(c->canvas) || !c->buf || c->W == 0 || c->H == 0) return;
+
+  // Trails / motion blur
+  lv_canvas_fill_bg(c->canvas, lv_color_black(), c->fade_opa);
+
+  for (auto* br : c->items) {
+    if (!br || !br->body) continue;
+    const cpVect p = cpBodyGetPosition(br->body);
+    draw_px_rect_(c->canvas, (int)p.x, (int)p.y, br->px, br->color);
+  }
+
+  cull_and_free_(c->items, c->W, c->H, c);
+}
+
+//============================== Space / Items ==============================//
+
+static inline cpBody* make_body_(cpSpace* space, float x, float y, float vx, float vy, float mass=1.0f) {
+  cpBody* body = cpBodyNew((cpFloat)mass, (cpFloat)INFINITY);  // no rotation
+  cpBodySetPosition(body, cpv((cpFloat)x,(cpFloat)y));
+  cpBodySetVelocity(body, cpv((cpFloat)vx,(cpFloat)vy));
+  cpSpaceAddBody(space, body);
+  return body;
+}
+
+static inline void create_space_(Ctx* c) {
+  if (!c || c->space) return;
+  c->space = cpSpaceNew();
+  cpSpaceSetIterations(c->space, 12);
+  cpSpaceSetDamping(c->space, (cpFloat)0.993);
+  cpSpaceSetSleepTimeThreshold(c->space, (cpFloat)0.30);
+  cpSpaceSetGravity(c->space, cpv((cpFloat)0, (cpFloat)c->grav_px_s2));
+}
+
+static inline void clear_items_(Ctx* c) {
+  if (!c) return;
+  for (auto* br : c->items) { if (br) { free_body_(br->body); delete br; } }
+  c->items.clear();
+  c->inflight = 0;
+}
+
+//============================== Size-aware parameterization ==============================//
+
+static inline void recompute_params_(Ctx* c) {
+  if (!c || c->H == 0) return;
+
+  // Gravity proportional to height → consistent look across sizes.
+  // Baseline ~180 px/s^2 at 64px tall ⇒ ≈ 2.8125 * H
+  const float g = 2.8125f * (float)c->H;  // px/s^2
+  c->grav_px_s2 = g;
+
+  // Target apex ~62% up from launch y ⇒ v0 = sqrt(2 g Δh)
+  const float delta_h = 0.62f * (float)c->H;
+  const float v0      = sqrtf(2.0f * g * delta_h);     // upward magnitude
+
+  // Launch scatter around v0
+  c->launch_vy_min = -1.10f * v0;
+  c->launch_vy_max = -0.90f * v0;
+
+  // Tiny horizontal wobble scales with height
+  c->launch_vx_abs = 0.06f * (float)c->H;
+
+  // Burst timing around apex t = v0/g (ms)
+  const float t_apex_s = v0 / g;
+  const uint32_t t_ms  = (uint32_t)(t_apex_s * 1000.0f);
+  c->burst_t_min_ms    = (uint32_t)(0.90f * t_ms);
+  c->burst_t_max_ms    = (uint32_t)(1.10f * t_ms);
+
+  // Fragment speeds scale with launch speed → consistent diameter
+  c->frag_speed_min    = 0.55f * v0;
+  c->frag_speed_max    = 0.95f * v0;
+}
+
+//============================== Spawning & Bursting (single-loop) ==============================//
+
+static inline BodyRef* spawn_particle_(Ctx* c, float x, float y, float vx, float vy,
+                                       lv_color_t base, uint8_t px=1, uint32_t life_ms=1000,
+                                       bool can_split=false, uint32_t split_ms=0) {
+  if (!c || !c->space) return nullptr;
   BodyRef* br = new BodyRef();
   br->is_rocket = false;
   br->born_ms   = now_ms();
@@ -166,65 +255,34 @@ static BodyRef* spawn_particle_(Ctx* c, int x, int y, float vx, float vy,
   br->can_split = can_split;
   br->split_ms  = split_ms;
 
-  const cpFloat m = 1.0f;
-  br->body = cpBodyNew(m, INFINITY); // no rotation needed
-  cpBodySetPosition(br->body, cpv((cpFloat)x, (cpFloat)y));
-  cpBodySetVelocity(br->body, cpv(vx, vy));
-  cpSpaceAddBody(c->space, br->body);
-
+  br->body = make_body_(c->space, x, y, vx, vy, 1.0f);
   c->items.push_back(br);
   return br;
 }
 
-static BodyRef* spawn_rocket_(Ctx* c, int x) {
-  if (!c || !c->alive || !c->space || c->stepping) return nullptr;
+static inline BodyRef* spawn_core_(Ctx* c, float cx, float cy, uint32_t life_ms=1500, uint8_t px=2) {
+  if (!c || !c->space) return nullptr;
+  const float vx = frand(-c->launch_vx_abs, c->launch_vx_abs);
+  const float vy = frand(c->launch_vy_min, c->launch_vy_max);
 
-  BodyRef* br = new BodyRef();
-  br->is_rocket = true;
-  br->born_ms   = now_ms();
-  br->px        = 1;
-  br->color     = lv_color_hex(0xFFFFFF);
+  BodyRef* core = new BodyRef();
+  core->is_rocket = true;
+  core->born_ms   = now_ms();
+  core->fuse_ms   = (uint32_t)frand(0.85f, 1.15f) * (c->burst_t_min_ms + c->burst_t_max_ms)/2;
+  core->life_ms   = life_ms;
+  core->px        = px;
+  core->color     = lv_color_white();
 
-  // --- height-aware scaling (64px baseline) ---
-  const int   H       = (int)c->H;
-  const float hscale  = (H <= 0) ? 1.0f : (H / 64.0f);
-  const float s       = sqrtf(hscale);  // height ∝ v^2 → scale v by √hscale
-
-  // Base randoms
-  // fuse: 400..619ms  → scaled by √hscale so burst timing feels similar on taller canvases
-  const uint32_t fuse_ms_base = 400u + (esp_random() % 220u);
-  br->fuse_ms = (uint32_t)((float)fuse_ms_base * s);
-
-  // horizontal drift
-  float vx = (float)((int)(esp_random() % 31) - 15) * 0.12f;
-
-  // vertical launch speed: 180..219 px/s → scale by √hscale
-  const float v0_base = 180.0f + (esp_random() % 40);
-  float v0 = v0_base * s;
-
-  // Safety clamp so apex stays on-screen even for very tall canvases:
-  // apex ≈ v^2 / (2g)
-  const float g        = GRAVITY_PX_S2;
-  const float max_apex = 0.93f * (float)H;
-  const float v0_max   = sqrtf(std::max(0.0f, 2.0f * g * max_apex));
-  v0 = std::min(v0, v0_max);
-
-  // Body
-  const cpFloat m = 0.8f;
-  br->body = cpBodyNew(m, INFINITY);
-  cpBodySetPosition(br->body, cpv((cpFloat)x, (cpFloat)(c->H - 1)));
-  cpBodySetVelocity(br->body, cpv(vx, -v0));  // up is -Y
-  cpSpaceAddBody(c->space, br->body);
-
-  c->items.push_back(br);
+  core->body = make_body_(c->space, cx, cy, vx, vy, 1.0f);
+  c->items.push_back(core);
   c->inflight++;
-  return br;
+  return core;
 }
 
-// ---------- patterns ----------
+// ----- Burst patterns -----
 enum class BurstKind : uint8_t { PEONY, CHRYS, RING, STAR5, STAR6, PALM, WILLOW, CROSSETTE };
 
-static BurstKind pick_burst_kind() {
+static inline BurstKind pick_burst_kind() {
   uint8_t r = esp_random() % 100;
   if (r < 28) return BurstKind::PEONY;
   if (r < 45) return BurstKind::RING;
@@ -236,86 +294,83 @@ static BurstKind pick_burst_kind() {
   return BurstKind::CROSSETTE;
 }
 
-static void burst_peony_(Ctx* c, int cx, int cy, bool chrys=false) {
-  bool accent = (esp_random() % 6 == 0);
+static inline void burst_peony_(Ctx* c, int cx, int cy, bool chrys=false) {
+  bool accent = (frand(0,1) < 1.0f/6.0f);
   lv_color_t base = accent ? pick_accent() : pick_warm();
-  int n      = 20 + (esp_random() % 18);
-  float s0   = 70.0f + (esp_random()%50);
-  int life   = chrys ? (1100 + (esp_random()%600)) : (800 + (esp_random()%400));
+  const int   n   = 20 + (int)frand(0,18);
+  const float s0  = frand(c->frag_speed_min*0.8f, c->frag_speed_max*0.85f);
+  const int   life= chrys ? (1100 + (int)frand(0,600)) : (800 + (int)frand(0,400));
   for (int i=0;i<n;i++) {
     float a = (2.0f * (float)M_PI * i) / n;
-    float jitter = ((int)(esp_random()%101) - 50) * 0.012f;
-    float sp = s0 * (0.90f + (esp_random()%21)/100.0f);
+    float jitter = frand(-0.6f, 0.6f) * 0.02f;
+    float sp = s0 * frand(0.90f, 1.10f);
     float vx = cosf(a + jitter) * sp;
     float vy = sinf(a + jitter) * sp;
-    uint8_t px = (esp_random()%4==0) ? 2 : 1;
-    spawn_particle_(c, cx, cy, vx, vy, base, px, life);
+    uint8_t px = (frand(0,1) < 0.25f) ? 2 : 1;
+    spawn_particle_(c, (float)cx, (float)cy, vx, vy, base, px, (uint32_t)life);
   }
 }
-static void burst_ring_(Ctx* c, int cx, int cy) {
-  bool accent = (esp_random() % 3 == 0);
+static inline void burst_ring_(Ctx* c, int cx, int cy) {
+  bool accent = (frand(0,1) < 0.33f);
   lv_color_t base = accent ? pick_accent() : pick_warm();
-  int n    = 26 + (esp_random()%16);
-  float s  = 85.0f + (esp_random()%35);
-  int life = 850 + (esp_random()%450);
+  const int   n   = 26 + (int)frand(0,16);
+  const float s   = frand(c->frag_speed_min*0.9f, c->frag_speed_max*0.9f);
+  const int   life= 850 + (int)frand(0,450);
   for (int i=0;i<n;i++) {
     float a = (2.0f * (float)M_PI * i) / n;
-    float vx = cosf(a) * s, vy = sinf(a) * s;
-    spawn_particle_(c, cx, cy, vx, vy, base, 1, life);
+    spawn_particle_(c, (float)cx, (float)cy, cosf(a)*s, sinf(a)*s, base, 1, (uint32_t)life);
   }
 }
-static void burst_starN_(Ctx* c, int cx, int cy, int N) {
+static inline void burst_starN_(Ctx* c, int cx, int cy, int N) {
   lv_color_t base = pick_warm();
-  float s  = 95.0f + (esp_random()%35);
-  int life = 900 + (esp_random()%400);
+  const float s   = frand(c->frag_speed_min*0.95f, c->frag_speed_max);
+  const int   life= 900 + (int)frand(0,400);
   for (int i=0;i<N;i++) {
     float a = (2.0f * (float)M_PI * i) / N;
-    int rays = 3 + (esp_random()%2);
+    int rays = 3 + (int)frand(0,1);
     for (int k=0;k<rays;k++) {
       float t = 0.55f + 0.18f * k; // 55%, 73%, 91%
-      float vx = cosf(a) * s * t, vy = sinf(a) * s * t;
-      spawn_particle_(c, cx, cy, vx, vy, base, 1, life);
+      spawn_particle_(c, (float)cx, (float)cy, cosf(a)*s*t, sinf(a)*s*t, base, 1, (uint32_t)life);
     }
   }
   burst_ring_(c, cx, cy);
 }
-static void burst_palm_(Ctx* c, int cx, int cy) {
+static inline void burst_palm_(Ctx* c, int cx, int cy) {
   lv_color_t base = pick_warm();
-  int fronds = 8 + (esp_random()%6);
-  int life   = 1000 + (esp_random()%500);
+  const int fronds = 8 + (int)frand(0,6);
+  const int life   = 1000 + (int)frand(0,500);
   for (int i=0;i<fronds;i++) {
     float spread = (35.0f * (float)M_PI/180.0f);
-    float a = -((float)M_PI/2) + (-spread + 2*spread*((esp_random()%100)/100.0f));
-    float s = 105.0f + (esp_random()%25);
-    float vx = cosf(a) * s, vy = sinf(a) * s;
-    spawn_particle_(c, cx, cy, vx, vy, base, 2, life);
+    float a = -((float)M_PI/2) + frand(-spread, spread);
+    float s = frand(c->frag_speed_min*1.0f, c->frag_speed_max*1.05f);
+    spawn_particle_(c, (float)cx, (float)cy, cosf(a)*s, sinf(a)*s, base, 2, (uint32_t)life);
   }
 }
-static void burst_willow_(Ctx* c, int cx, int cy) {
+static inline void burst_willow_(Ctx* c, int cx, int cy) {
   lv_color_t base = pick_warm();
-  int n    = 18 + (esp_random()%10);
-  float s  = 55.0f + (esp_random()%15);
-  int life = 1600 + (esp_random()%800);
+  const int   n   = 18 + (int)frand(0,10);
+  const float s   = frand(c->frag_speed_min*0.65f, c->frag_speed_min*0.85f);
+  const int   life= 1600 + (int)frand(0,800);
   for (int i=0;i<n;i++) {
     float a = (2.0f * (float)M_PI * i) / n;
     float vx = cosf(a) * s, vy = sinf(a) * s + 2.0f; // gentle droop
-    spawn_particle_(c, cx, cy, vx, vy, base, 1, life);
+    spawn_particle_(c, (float)cx, (float)cy, vx, vy, base, 1, (uint32_t)life);
   }
 }
-static void burst_crossette_(Ctx* c, int cx, int cy) {
+static inline void burst_crossette_(Ctx* c, int cx, int cy) {
   lv_color_t base = pick_warm();
-  int n    = 10 + (esp_random()%6);
-  float s  = 80.0f + (esp_random()%20);
-  int life = 1100 + (esp_random()%300);
+  const int   n   = 10 + (int)frand(0,6);
+  const float s   = frand(c->frag_speed_min*0.9f, c->frag_speed_min*1.2f);
+  const int   life= 1100 + (int)frand(0,300);
   for (int i=0;i<n;i++) {
     float a = (2.0f * (float)M_PI * i) / n;
-    float vx = cosf(a) * s, vy = sinf(a) * s;
-    uint32_t split_ms = 240 + (esp_random()%220);
-    spawn_particle_(c, cx, cy, vx, vy, base, 1, life, /*can_split=*/true, split_ms);
+    const uint32_t split_ms = 240 + (uint32_t)frand(0,220);
+    spawn_particle_(c, (float)cx, (float)cy, cosf(a)*s, sinf(a)*s, base, 1, (uint32_t)life,
+                    /*can_split=*/true, split_ms);
   }
 }
-static void burst_(Ctx* c, int cx, int cy, BurstKind kind) {
-  switch (kind) {
+static inline void burst_dispatch_(Ctx* c, int cx, int cy, BurstKind k) {
+  switch (k) {
     case BurstKind::PEONY:     burst_peony_(c, cx, cy, false); break;
     case BurstKind::CHRYS:     burst_peony_(c, cx, cy, true);  break;
     case BurstKind::RING:      burst_ring_(c, cx, cy);         break;
@@ -326,173 +381,178 @@ static void burst_(Ctx* c, int cx, int cy, BurstKind kind) {
     case BurstKind::CROSSETTE: burst_crossette_(c, cx, cy);    break;
   }
 }
-static void maybe_split_crossettes_(Ctx* c, uint32_t tnow) {
-  if (!c || !c->space || c->stepping) return;
+
+// Crossette secondary split (handled pre-step within the single loop)
+static inline void handle_crossette_splits_(Ctx* c, uint32_t tnow) {
   std::vector<BodyRef*> to_split;
+  to_split.reserve(8);
   for (auto* it : c->items) {
-    if (!it || it->is_rocket || !it->alive || it->split_done || !it->can_split) continue;
+    if (!it || it->is_rocket || !it->body || it->split_done || !it->can_split) continue;
     if (tnow - it->born_ms >= it->split_ms) to_split.push_back(it);
   }
   for (auto* it : to_split) {
-    cpVect p = it->body ? cpBodyGetPosition(it->body) : cpv(0,0);
-    float sv = 70.0f + (esp_random()%20);
-    spawn_particle_(c, (int)p.x, (int)p.y,  sv,  0, it->color, 1, 600);
-    spawn_particle_(c, (int)p.x, (int)p.y, -sv,  0, it->color, 1, 600);
-    spawn_particle_(c, (int)p.x, (int)p.y,  0,  sv, it->color, 1, 600);
-    spawn_particle_(c, (int)p.x, (int)p.y,  0, -sv, it->color, 1, 600);
+    const cpVect p = cpBodyGetPosition(it->body);
+    const float sv = frand(c->frag_speed_min*0.55f, c->frag_speed_min*0.75f);
+    spawn_particle_(c, (float)p.x, (float)p.y,  sv,  0, it->color, 1, 600);
+    spawn_particle_(c, (float)p.x, (float)p.y, -sv,  0, it->color, 1, 600);
+    spawn_particle_(c, (float)p.x, (float)p.y,  0,  sv, it->color, 1, 600);
+    spawn_particle_(c, (float)p.x, (float)p.y,  0, -sv, it->color, 1, 600);
     it->split_done = true;
-    it->alive = false;
+    it->alive = false; // retire original shard
   }
 }
 
-// ---------- render + step ----------
-static void render_(Ctx* c) {
-  if (!c || !c->alive) return;
-
-  // trails / motion blur
-  if (obj_alive_(c->canvas)) {
-    lv_canvas_fill_bg(c->canvas, lv_color_black(), c->fade_opa);
-  }
-
-  // draw bodies
-  for (auto* it : c->items) {
-    if (!it || !it->alive || !it->body) continue;
-    cpVect p = cpBodyGetPosition(it->body);
-    draw_px_rect_(c->canvas, (int)p.x, (int)p.y, it->px, it->color);
-  }
-
-  const uint32_t tnow = now_ms();
-
-  // crossette splits
-  maybe_split_crossettes_(c, tnow);
-
-  // burst rockets that reached fuse (no clamping — burst where it is)
+// Rockets that reach fuse burst into one of the patterns
+static inline void handle_rocket_bursts_(Ctx* c, uint32_t tnow) {
   std::vector<BodyRef*> to_burst;
+  to_burst.reserve(4);
   for (auto* it : c->items) {
-    if (!it || !it->alive || !it->is_rocket || !it->body) continue;
+    if (!it || !it->is_rocket || !it->body) continue;
     if (tnow - it->born_ms >= it->fuse_ms) to_burst.push_back(it);
   }
   for (auto* it : to_burst) {
-    cpVect p = cpBodyGetPosition(it->body);
-    burst_(c, (int)p.x, (int)p.y, pick_burst_kind());
-    it->alive = false; // retire rocket; GC below will remove
+    const cpVect p = cpBodyGetPosition(it->body);
+    burst_dispatch_(c, (int)p.x, (int)p.y, pick_burst_kind());
+    it->alive = false;
     if (c->inflight) c->inflight--;
   }
-
-  // lifetime/visibility GC — keep until actually off-screen (with hard TTL)
-  std::vector<BodyRef*> keep;
-  keep.reserve(c->items.size());
-
-  for (auto* it : c->items) {
-    if (!it) continue;
-
-    cpVect p = it->body ? cpBodyGetPosition(it->body) : cpv(-9999, -9999);
-    bool off = (p.x < -CULL_MARGIN || p.x > (c->W - 1 + CULL_MARGIN) ||
-                p.y < -CULL_MARGIN || p.y > (c->H - 1 + CULL_MARGIN));
-    uint32_t age = now_ms() - it->born_ms;
-    bool hard_expired = age > std::max<uint32_t>(it->life_ms + SOFT_TTL_PAD_MS, HARD_TTL_MS);
-
-    // rockets: if retired or off, free; else keep
-    if (it->is_rocket) {
-      if (!it->alive || off) { free_bodyref_(c, it); }
-      else { keep.push_back(it); }
-      continue;
-    }
-
-    // particles: keep until off-screen (or hard TTL)
-    if (!it->alive || off || hard_expired) {
-      free_bodyref_(c, it);
-    } else {
-      keep.push_back(it);
-    }
-  }
-  c->items.swap(keep);
 }
 
-static void step_space_(Ctx* c) {
-  if (!c || !c->space) return;
-  c->stepping = true;
-  cpSpaceStep(c->space, c->step_dt * 0.5f);
-  cpSpaceStep(c->space, c->step_dt * 0.5f);
-  c->stepping = false;
+// Simple cadence to inject new cores (no second timer needed)
+static inline void maybe_spawn_(Ctx* c, uint32_t tnow) {
+  if (c->inflight >= MAX_INFLIGHT) return;
+  // Scale gap with screen/time-to-apex so big canvases don't get too "busy"
+  const uint32_t scaled_gap = std::max<uint32_t>(
+      MIN_SPAWN_GAP_MS,
+      (c->burst_t_min_ms + c->burst_t_max_ms) / 3  // ~0.33 * time-to-apex
+  );
+  if (tnow - c->last_spawn_ms < scaled_gap) return;
+
+  const float pad = 8.0f;
+  const float cx = frand(pad, std::max(pad, (float)c->W - pad));
+  const float cy = (float)c->H - 2.0f; // near ground
+  spawn_core_(c, cx, cy, 1300 + (uint32_t)frand(0, 500), 2);
+  c->last_spawn_ms = tnow;
 }
 
-// ---------- spawn driver ----------
-static void spawn_loop_(Ctx* c) {
-  if (!c || !c->alive || !c->space || c->stepping) return;
-  if (c->inflight >= c->inflight_max) return;
-  uint32_t now = now_ms();
-  uint32_t due = 330 + (esp_random()%640);
-  if (now - c->spawn_last_ms < due) return;
-  c->spawn_last_ms = now;
+//============================== Lifecycle helpers ==============================//
 
-  // near-full width; tiny safety margin
-  int x = 2 + (esp_random() % std::max<int>(2, (int)c->W - 4));
-  spawn_rocket_(c, x);
+static inline void ctx_stop_timer_(Ctx* c){
+  if (!c) return;
+  if (c->tick) { lv_timer_del(c->tick); c->tick = nullptr; }
+  c->running = false;
 }
 
-// ---------- init helpers ----------
-static void prepare_canvas_(lv_obj_t* canvas, uint16_t W, uint16_t H) {
-  lv_obj_remove_style_all(canvas);
-  lv_obj_clear_flag(canvas, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_scrollbar_mode(canvas, LV_SCROLLBAR_MODE_OFF);
-  lv_obj_set_style_pad_all(canvas, 0, LV_PART_MAIN);
-  lv_obj_set_size(canvas, W, H);
-  lv_obj_set_pos(canvas, 0, 0);
+static inline void ctx_free_canvas_buf_(Ctx* c){
+  if (!c) return;
+  if (c->buf) { lv_mem_free(c->buf); c->buf = nullptr; }
 }
 
-static void create_space_(Ctx* c) {
-  c->space = cpSpaceNew();
-  cpSpaceSetIterations(c->space, 12);
-  cpSpaceSetDamping(c->space, 0.993f);
-  cpSpaceSetSleepTimeThreshold(c->space, 0.30f);
-  cpSpaceSetGravity(c->space, cpv(0, GRAVITY_PX_S2));
-}
-
-// ---------- canvas-first API ----------
-static inline void on_canvas_attach(lv_obj_t* canvas) {
-  if (!canvas || !lv_obj_is_valid(canvas)) return;
-  Ctx* c = new Ctx();
-  c->canvas = canvas;
-  c->layer  = lv_obj_get_parent(canvas);
-  c->W = (uint16_t) lv_obj_get_width(canvas);
-  c->H = (uint16_t) lv_obj_get_height(canvas);
-
-  if (c->layer && lv_obj_is_valid(c->layer)) {
-    lv_obj_clear_flag(c->layer, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_scrollbar_mode(c->layer, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_set_style_pad_all(c->layer, 0, LV_PART_MAIN);
-  }
-  prepare_canvas_(canvas, c->W, c->H);
-
-  c->buf = (uint8_t*) lv_mem_alloc(c->W * c->H * 2);
-  lv_canvas_set_buffer(canvas, c->buf, c->W, c->H, LV_IMG_CF_TRUE_COLOR);
-  lv_canvas_fill_bg(canvas, lv_color_black(), LV_OPA_COVER);
-
-  lv_obj_set_user_data(canvas, c);
-  create_space_(c);
+// Single-loop timer: mutate → step → render
+static inline void ctx_start_timer_(Ctx* c){
+  if (!c || c->running) return;
 
   c->tick = lv_timer_create([](lv_timer_t* t){
-    Ctx* ctx = (Ctx*) t->user_data;
-    if (!ctx || !ctx->alive) return;
-    step_space_(ctx);
-    render_(ctx);
+    auto* c = (Ctx*) t->user_data;
+    if (!c || !c->alive || !obj_alive_(c->canvas) || !c->buf || c->W == 0 || c->H == 0 || !c->space) return;
+
+    const uint32_t tnow = now_ms();
+
+    // 1) pre-step mutations
+    handle_crossette_splits_(c, tnow);
+    handle_rocket_bursts_(c, tnow);
+    maybe_spawn_(c, tnow);
+
+    // 2) step physics
+    cpSpaceSetGravity(c->space, cpv((cpFloat)0, (cpFloat)c->grav_px_s2));
+    cpSpaceStep(c->space, (cpFloat)TICK_MS / (cpFloat)1000.0);
+
+    // 3) render & cull
+    render_(c);
   }, TICK_MS, c);
 
-  c->spawner = lv_timer_create([](lv_timer_t* t){
-    Ctx* ctx = (Ctx*) t->user_data;
-    if (!ctx || !ctx->alive) return;
-    spawn_loop_(ctx);
-  }, SPAWN_MS, c);
+  c->running = true;
+}
 
+// Resize/start: allocate new buffer; set it; free old; recompute physics; (re)start timer
+static inline void ctx_resize_start_(Ctx* c, uint16_t w, uint16_t h){
+  if (!c || !obj_alive_(c->canvas) || w==0 || h==0) return;
+
+  if (c->buf && c->W == w && c->H == h) { // size unchanged
+    if (!c->running) ctx_start_timer_(c);
+    return;
+  }
+
+  ctx_stop_timer_(c);
+  clear_items_(c);
+
+  uint8_t* newbuf = (uint8_t*) lv_mem_alloc((size_t)w * h * 2 /*RGB565*/);
+  if (!newbuf) return; // OOM: keep previous state if any
+
+  // Respect external layout; we only swap buffers
+  lv_canvas_set_buffer(c->canvas, newbuf, w, h, LV_IMG_CF_TRUE_COLOR);
+  lv_canvas_fill_bg(c->canvas, lv_color_black(), LV_OPA_COVER);
+
+  uint8_t* old = c->buf; c->buf = newbuf;
+  c->W = w; c->H = h;
+  if (old) lv_mem_free(old);
+
+  if (!c->space) create_space_(c);
+
+  recompute_params_(c);
+  ctx_start_timer_(c);
+}
+
+// Debounced size-commit: read current size and (re)start once per burst
+static void resize_commit_cb_(lv_timer_t* t){
+  auto* c = (Ctx*) t->user_data;
+  if (!c || !c->alive || !obj_alive_(c->canvas)) { if (t) lv_timer_del(t); return; }
+  c->resize_debounce = nullptr;
+
+  lv_obj_update_layout(c->canvas);
+  const uint16_t w = (uint16_t) lv_obj_get_width(c->canvas);
+  const uint16_t h = (uint16_t) lv_obj_get_height(c->canvas);
+  ctx_resize_start_(c, w, h);
+}
+
+//============================== Attach / Detach ==============================//
+
+static inline void on_canvas_attach(lv_obj_t* canvas) {
+  if (!canvas || !lv_obj_is_valid(canvas)) return;
+
+  Ctx* c = new Ctx();
+  c->canvas = canvas;
+  lv_obj_set_user_data(canvas, c);
+
+  // Debounced SIZE_CHANGED to coalesce layout bursts
   lv_obj_add_event_cb(canvas, [](lv_event_t* e){
+    if (lv_event_get_code(e) != LV_EVENT_SIZE_CHANGED) return;
+    auto* c = (Ctx*) lv_event_get_user_data(e);
+    if (!c || !c->alive) return;
+    if (c->resize_debounce) lv_timer_reset(c->resize_debounce);
+    else c->resize_debounce = lv_timer_create(resize_commit_cb_, 20, c);
+  }, LV_EVENT_SIZE_CHANGED, c);
+
+  // Teardown on DELETE (mirrors explicit detach)
+  lv_obj_add_event_cb(canvas, [](lv_event_t* e){
+    if (lv_event_get_code(e) != LV_EVENT_DELETE) return;
     auto* cv = (lv_obj_t*) lv_event_get_target(e);
-    auto* ctx = (Ctx*) lv_obj_get_user_data(cv);
-    if (!ctx) return;
-    ctx->alive = false;
-    if (ctx->tick)    { lv_timer_del(ctx->tick);    ctx->tick=nullptr; }
-    if (ctx->spawner) { lv_timer_del(ctx->spawner); ctx->spawner=nullptr; }
+    auto* c  = (Ctx*) lv_obj_get_user_data(cv);
+    if (!c) return;
+    c->alive = false;
+    if (c->resize_debounce) { lv_timer_del(c->resize_debounce); c->resize_debounce = nullptr; }
+    if (c->tick) { lv_timer_del(c->tick); c->tick = nullptr; }
+    clear_items_(c);
+    if (c->buf) { lv_mem_free(c->buf); c->buf = nullptr; }
+    if (c->space) { cpSpaceFree(c->space); c->space = nullptr; }
+    lv_obj_set_user_data(cv, nullptr);
+    c->canvas = nullptr;
+    delete c;
   }, LV_EVENT_DELETE, nullptr);
+
+  // Bootstrap: create space and buffer through the same debounced path
+  create_space_(c);
+  c->resize_debounce = lv_timer_create(resize_commit_cb_, 1, c);
 }
 
 static inline void on_canvas_detach(lv_obj_t* canvas) {
@@ -501,16 +561,13 @@ static inline void on_canvas_detach(lv_obj_t* canvas) {
   if (!c) return;
 
   c->alive = false;
-  if (c->tick)    { lv_timer_del(c->tick);    c->tick=nullptr; }
-  if (c->spawner) { lv_timer_del(c->spawner); c->spawner=nullptr; }
-
+  if (c->resize_debounce) { lv_timer_del(c->resize_debounce); c->resize_debounce = nullptr; }
+  if (c->tick) { lv_timer_del(c->tick); c->tick = nullptr; }
   clear_items_(c);
-
   if (c->buf) { lv_mem_free(c->buf); c->buf = nullptr; }
-  lv_obj_set_user_data(canvas, nullptr);
-
   if (c->space) { cpSpaceFree(c->space); c->space = nullptr; }
-
+  lv_obj_set_user_data(canvas, nullptr);
+  c->canvas = nullptr;
   delete c;
 }
 
@@ -519,13 +576,15 @@ static inline void on_canvas_detach(lv_obj_t* canvas) {
 #ifdef __cplusplus
 extern "C++" {
 #endif
-// Canvas-first API
+
+// Public Canvas-first API
 static inline void fireworks_physics_attach_to_canvas(lv_obj_t* canvas) {
   fireworks_canvas_detail::on_canvas_attach(canvas);
 }
 static inline void fireworks_physics_detach_from_canvas(lv_obj_t* canvas) {
   fireworks_canvas_detail::on_canvas_detach(canvas);
 }
+
 #ifdef __cplusplus
 }
 #endif
