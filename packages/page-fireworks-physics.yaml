@@ -11,9 +11,7 @@ esphome:
     - src/page_fireworks_physics.h
 
 external_components:
-  - source:
-      type: local
-      path: /Builds/esphome_chipmunk2d/esphome/components
+  - source: github://stuartparmenter/chipmunk2d-esphome@v0.1.0
     components: [chipmunk2d]
 
 chipmunk2d:
