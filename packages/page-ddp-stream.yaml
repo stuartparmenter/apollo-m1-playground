@@ -12,12 +12,12 @@ substitutions:
   # WS_DDP_PORT: "8788"
   # DDP_PORT: "4048"
   # DEFAULT_VIDEO_SRC: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"   # or "mario.gif" or https://... / file:///sd/... etc.
-  CANVAS_WIDTH: "64"
-  CANVAS_HEIGHT: "64"
+  CANVAS_WIDTH: ${DISPLAY_W}
+  CANVAS_HEIGHT: ${DISPLAY_H}
   OUT_ID: "1"
 
 external_components:
-  - source: github://stuartparmenter/lvgl-ddp-stream@v0.2.0
+  - source: github://stuartparmenter/lvgl-ddp-stream@v0.2.1
     components: [ddp_stream, ws_ddp_control]
 
 # UDP DDP sink + canvas bindings (no w/h required here)
@@ -26,7 +26,7 @@ ddp_stream:
   port: ${DDP_PORT}
   streams:
     - id: ${OUT_ID}
-      canvas_id: "canvas64"
+      canvas_id: "video_canvas"
     # - id: 2
     #   canvas_id: "canvas32"
 
@@ -60,7 +60,7 @@ lvgl:
     - id: ddp_video
       widgets:
         - canvas:
-            id: canvas64
+            id: video_canvas
             width: ${CANVAS_WIDTH}
             height: ${CANVAS_HEIGHT}
       on_load:
