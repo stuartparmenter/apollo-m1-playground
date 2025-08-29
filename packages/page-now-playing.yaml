@@ -6,11 +6,11 @@
 
 substitutions:
   # MEDIA_PLAYER_ENTITY: media_player.your_media_player
-  CANVAS_WIDTH: "64"
-  CANVAS_HEIGHT: "64"
+  ART_CANVAS_WIDTH: "64"
+  ART_CANVAS_HEIGHT: "64"
   ART_X: "64"
   ART_Y: "0"
-  OUT_ID: "11"
+  NP_OUT_ID: "11"
   DEFAULT_ART_SRC: "https://placehold.co/64x64/000/FFF/png"
 
 external_components:
@@ -38,7 +38,7 @@ ddp_stream:
   id: ddp
   port: ${DDP_PORT}
   streams:
-    - id: ${OUT_ID}
+    - id: ${NP_OUT_ID}
       canvas_id: "art_canvas"
       back_buffers: 0
 
@@ -49,7 +49,7 @@ ws_ddp_control:
   ws_port: ${WS_DDP_PORT}
   ddp: ddp
   outputs:
-    - id: ${OUT_ID}
+    - id: ${NP_OUT_ID}
       src: ${DEFAULT_ART_SRC}
       loop: false
 
@@ -97,7 +97,7 @@ text_sensor:
           then:
             - lambda: |-
                 id(art_src_ctl) = std::string(x.c_str());
-                id(ws).set_src(${OUT_ID}, id(art_src_ctl).c_str());
+                id(ws).set_src(${NP_OUT_ID}, id(art_src_ctl).c_str());
                 id(last_art_url) = id(art_src_ctl);
 
   - platform: homeassistant
@@ -127,7 +127,7 @@ sensor:
           then:
             - lambda: |-
                 id(art_src_ctl) = id(ha_entity_picture).state;
-                id(ws).set_src(${OUT_ID}, id(art_src_ctl).c_str());
+                id(ws).set_src(${NP_OUT_ID}, id(art_src_ctl).c_str());
                 id(last_art_url) = id(art_src_ctl);
 
   - platform: homeassistant
@@ -346,14 +346,14 @@ lvgl:
             id: art_canvas
             x: ${ART_X}
             y: ${ART_Y}
-            width: ${CANVAS_WIDTH}
-            height: ${CANVAS_HEIGHT}
+            width: ${ART_CANVAS_WIDTH}
+            height: ${ART_CANVAS_HEIGHT}
 
       on_load:
         then:
           - lambda: |-
               id(ws).connect();
-              id(ws).start(${OUT_ID});
+              id(ws).start(${NP_OUT_ID});
           - if:
               condition:
                 lambda: 'return id(ha_media_title).has_state();'
@@ -374,7 +374,7 @@ lvgl:
               then:
                 - lambda: |-
                     id(art_src_ctl) = id(ha_entity_picture).state;
-                    id(ws).set_src(${OUT_ID}, id(art_src_ctl).c_str());
+                    id(ws).set_src(${NP_OUT_ID}, id(art_src_ctl).c_str());
                     id(last_art_url) = id(art_src_ctl);
           - lambda: |-
               lv_obj_set_style_anim_speed(id(title_lbl), 7, LV_PART_MAIN);
