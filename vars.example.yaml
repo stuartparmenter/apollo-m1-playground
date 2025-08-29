@@ -26,5 +26,8 @@ substitutions:
   DDP_PORT: "4048"
   DEFAULT_VIDEO_SRC: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" # or "mario.gif" or https://... / file:///sd/... etc.
 
+  # ===== Now Playing =====
+  MEDIA_PLAYER_ENTITY: "media_player.your_media_player"
+
   # ===== MSR-2 Radar Screen =====
   MSR2_PREFIX: apollo_msr_2_xxxxxx

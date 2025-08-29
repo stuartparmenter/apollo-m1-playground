@@ -19,6 +19,9 @@ packages:
   # Basic weather & clock dashboard
   - !include packages/page-weather-clock.yaml
 
+  # "Now Playing" media player page
+  - !include packages/page-now-playing.yaml
+
   # Fancy fireworks, but uses more memory
   - !include packages/page-fireworks-physics.yaml
 

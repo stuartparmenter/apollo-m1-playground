@@ -1,0 +1,382 @@
+# © Copyright 2025 Stuart Parmenter
+# SPDX-License-Identifier: MIT
+
+# Now Playing (LVGL + DDP)
+# This is designed to work with two horizontal panels (128x64)
+
+substitutions:
+  # MEDIA_PLAYER_ENTITY: media_player.your_media_player
+  CANVAS_WIDTH: "64"
+  CANVAS_HEIGHT: "64"
+  ART_X: "64"
+  ART_Y: "0"
+  OUT_ID: "11"
+  DEFAULT_ART_SRC: "https://placehold.co/64x64/000/FFF/png"
+
+external_components:
+  - source: github://stuartparmenter/lvgl-ddp-stream@v0.2.2
+    components: [ddp_stream, ws_ddp_control]
+
+globals:
+  - id: last_art_url
+    type: std::string
+    restore_value: no
+    initial_value: '""'
+  
+  - id: art_src_ctl
+    type: std::string
+    restore_value: no
+    initial_value: '"${DEFAULT_ART_SRC}"'
+  
+  - id: media_progress_pct
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+# DDP sink + canvas binding
+ddp_stream:
+  id: ddp
+  port: ${DDP_PORT}
+  streams:
+    - id: ${OUT_ID}
+      canvas_id: "art_canvas"
+      back_buffers: 0
+
+# WebSocket control for artwork streaming
+ws_ddp_control:
+  id: ws
+  ws_host: ${WS_DDP_HOST}
+  ws_port: ${WS_DDP_PORT}
+  ddp: ddp
+  outputs:
+    - id: ${OUT_ID}
+      src: ${DEFAULT_ART_SRC}
+      loop: false
+
+# Pull metadata from Home Assistant
+text_sensor:
+  - platform: homeassistant
+    id: ha_media_title
+    entity_id: ${MEDIA_PLAYER_ENTITY}
+    attribute: media_title
+    internal: true
+    on_value:
+      - lvgl.label.update:
+          id: title_lbl
+          text: !lambda 'return x;'
+
+  - platform: homeassistant
+    id: ha_media_artist
+    entity_id: ${MEDIA_PLAYER_ENTITY}
+    attribute: media_artist
+    internal: true
+    on_value:
+      - lvgl.label.update:
+          id: artist_lbl
+          text: !lambda 'return x;'
+
+  - platform: homeassistant
+    id: ha_media_album
+    entity_id: ${MEDIA_PLAYER_ENTITY}
+    attribute: media_album_name
+    internal: true
+    on_value:
+      - lvgl.label.update:
+          id: album_lbl
+          text: !lambda 'return x;'
+
+  - platform: homeassistant
+    id: ha_entity_picture
+    entity_id: ${MEDIA_PLAYER_ENTITY}
+    attribute: entity_picture
+    internal: true
+    on_value:
+      - if:
+          condition:
+            lambda: 'return id(last_art_url) != std::string(x.c_str());'
+          then:
+            - lambda: |-
+                id(art_src_ctl) = std::string(x.c_str());
+                id(ws).set_src(${OUT_ID}, id(art_src_ctl).c_str());
+                id(last_art_url) = id(art_src_ctl);
+
+  - platform: homeassistant
+    id: ha_media_state
+    entity_id: ${MEDIA_PLAYER_ENTITY}
+
+  - platform: homeassistant
+    id: ha_media_pos_updated_at
+    entity_id: ${MEDIA_PLAYER_ENTITY}
+    attribute: media_position_updated_at
+
+  - platform: homeassistant
+    id: ha_media_content_id
+    entity_id: ${MEDIA_PLAYER_ENTITY}
+    attribute: media_content_id
+
+sensor:
+  - platform: homeassistant
+    id: ha_media_position
+    entity_id: ${MEDIA_PLAYER_ENTITY}
+    attribute: media_position
+    internal: true
+    on_value:
+      - if:
+          condition:
+            lambda: 'return x < 1.0f && id(ha_entity_picture).has_state();'
+          then:
+            - lambda: |-
+                id(art_src_ctl) = id(ha_entity_picture).state;
+                id(ws).set_src(${OUT_ID}, id(art_src_ctl).c_str());
+                id(last_art_url) = id(art_src_ctl);
+
+  - platform: homeassistant
+    id: ha_media_duration
+    entity_id: ${MEDIA_PLAYER_ENTITY}
+    attribute: media_duration
+    internal: true
+
+interval:
+  # This runs always regardless of if the page is active.  This is intentional to keep the progress bar always correct.
+  # Could be worth revisiting if it adds too much overhead (but it should be pretty low)
+  - interval: 1s
+    then:
+      - lambda: |-
+          const float dur = id(ha_media_duration).state;        // seconds
+          const float pos_raw = id(ha_media_position).state;     // anchor only
+          const auto  st  = id(ha_media_state).state;            // "playing"/"paused"/...
+          const auto  upd = id(ha_media_pos_updated_at).state;   // change marker
+          const auto  cid = id(ha_media_content_id).state;       // track id
+          const uint32_t now_ms = millis();
+
+          // Sticky anchors
+          static float base_pos = 0.0f;
+          static uint32_t base_ms = 0;
+          static std::string last_state;
+          static std::string last_upd;
+          static std::string last_cid;
+          static bool first_run = true;
+
+          // Re-anchor on: seek/track change, state transition, or first run.
+          bool reanchor = false;
+          bool track_changed = false;
+          
+          if (upd != last_upd) { last_upd = upd; reanchor = true; }
+          if (cid != last_cid) { 
+            last_cid = cid; 
+            reanchor = true;
+            track_changed = true;
+            // Reset progress to 0 on track change
+            if (!first_run) {
+              id(media_progress_pct) = 0;
+              lv_bar_set_value(id(progress_bar), 0, LV_ANIM_OFF);
+              ESP_LOGD("now_playing", "Track changed, resetting progress");
+            }
+          }
+          if (st != last_state) { last_state = st; reanchor = true; }
+
+          if (reanchor || first_run) {
+            // On track change, always start from 0 regardless of what HA reports
+            // because HA often reports stale position data from previous track
+            if (track_changed && !first_run) {
+              base_pos = 0.0f;
+              ESP_LOGD("now_playing", "Track change detected, forcing position to 0 (HA reported %.1f)", pos_raw);
+            } else {
+              base_pos = std::isnan(pos_raw) ? 0.0f : pos_raw;  // anchor to HA's offset (often 0 on Sonos/Spotify)
+            }
+            base_ms = now_ms;
+            first_run = false;
+          }
+
+          // Skip calculation if no valid duration
+          if (dur <= 0.0f || std::isnan(dur)) {
+            id(media_progress_pct) = 0;
+            lv_bar_set_value(id(progress_bar), 0, LV_ANIM_OFF);
+            ESP_LOGD("now_playing", "Invalid duration, setting progress to 0");
+            return;
+          }
+
+          // Compute live position: advance only while playing
+          float pos_live = base_pos;
+          if (st == "playing") {
+            pos_live = base_pos + (now_ms - base_ms) / 1000.0f;
+          }
+
+          // Clamp position
+          if (pos_live < 0.0f) pos_live = 0.0f;
+          if (pos_live > dur) pos_live = dur;
+
+          // Calculate percentage
+          int pct = (int)((pos_live / dur) * 100.0f + 0.5f);
+          if (pct < 0) pct = 0;
+          if (pct > 100) pct = 100;
+
+          // Only update if percentage actually changed to reduce unnecessary updates
+          if (id(media_progress_pct) != pct) {
+            id(media_progress_pct) = pct;
+            lv_bar_set_value(id(progress_bar), pct, LV_ANIM_OFF);
+          }
+
+          ESP_LOGD("now_playing", "dur=%.1f state=%s raw=%.1f anchor=%.1f live=%.1f -> %d%%",
+                   dur, st.c_str(), pos_raw, base_pos, pos_live, pct);
+
+lvgl:
+  style_definitions:
+    - id: page_black
+      bg_color: 0x000000
+      bg_opa: 100%
+      pad_all: 0
+      border_opa: TRANSP
+
+    - id: panel_left_box
+      bg_opa: TRANSP
+      border_opa: TRANSP
+      outline_opa: TRANSP
+      radius: 0
+      pad_left: 2
+      pad_right: 2
+      pad_top: 2
+      pad_bottom: 2
+      pad_column: 0
+      pad_row: 2
+
+    # Progress bar styles (track + indicator)
+    # Text hierarchy via opacity (monochrome)
+    - id: st_title_text
+      text_opa: 95%
+    - id: st_artist_text
+      text_opa: 80%
+    - id: st_album_text
+      text_opa: 65%
+
+    # Hairline divider (subtle)
+    - id: st_divider
+      bg_color: 0x303030
+      bg_opa: COVER
+      border_width: 0
+      pad_all: 0
+
+    - id: st_spacer_invisible
+      bg_opa: TRANSP
+      border_opa: TRANSP
+      outline_opa: TRANSP
+      shadow_opa: TRANSP
+      pad_all: 0
+
+    - id: st_bar_progress
+      pad_all: 0
+      bg_color: 0x001122
+      bg_opa: COVER
+
+    - id: st_bar_indicator
+      bg_color: 0x228B22
+      bg_opa: COVER
+
+  pages:
+    - id: now_playing
+      bg_color: 0x000000
+      widgets:
+        # LEFT: 64×64 text column
+        - obj:
+            id: left_panel
+            x: 0
+            y: 0
+            width: 64
+            height: 64
+            layout:
+              type: flex
+              flex_flow: COLUMN
+              pad_row: 2
+              pad_column: 0
+            styles: [panel_left_box]
+            widgets:
+              - label:
+                  id: title_lbl
+                  width: 100%
+                  long_mode: SCROLL_CIRCULAR
+                  text: ""
+                  styles: [st_spleen8, st_title_text]
+
+              - obj:
+                  id: div_above_artist
+                  width: 100%
+                  height: 1
+                  styles: [st_divider]
+
+              - label:
+                  id: artist_lbl
+                  width: 100%
+                  long_mode: SCROLL
+                  text: ""
+                  styles: [st_spleen8, st_artist_text]
+
+              - label:
+                  id: album_lbl
+                  width: 100%
+                  long_mode: SCROLL
+                  text: ""
+                  styles: [st_spleen8, st_album_text]
+
+              - obj:
+                  id: spacer_footer
+                  width: 1
+                  height: 1
+                  flex_grow: 1
+                  styles: [st_spacer_invisible]
+
+              - obj:
+                  id: div_above_progress
+                  width: 100%
+                  height: 1
+                  styles: [st_divider]
+
+              - bar:
+                  id: progress_bar
+                  width: 100%
+                  height: 6
+                  animated: false
+                  min_value: 0
+                  max_value: 100
+                  mode: NORMAL
+                  indicator:
+                    styles: [st_bar_indicator]
+                  styles: [st_bar_progress]
+
+        - canvas:
+            id: art_canvas
+            x: ${ART_X}
+            y: ${ART_Y}
+            width: ${CANVAS_WIDTH}
+            height: ${CANVAS_HEIGHT}
+
+      on_load:
+        then:
+          - lambda: |-
+              id(ws).connect();
+              id(ws).start(${OUT_ID});
+          - if:
+              condition:
+                lambda: 'return id(ha_media_title).has_state();'
+              then:
+                - lvgl.label.update:
+                    id: title_lbl
+                    text: !lambda 'return id(ha_media_title).state;'
+          - if:
+              condition:
+                lambda: 'return id(ha_media_artist).has_state();'
+              then:
+                - lvgl.label.update:
+                    id: artist_lbl
+                    text: !lambda 'return id(ha_media_artist).state;'
+          - if:
+              condition:
+                lambda: 'return id(ha_entity_picture).has_state();'
+              then:
+                - lambda: |-
+                    id(art_src_ctl) = id(ha_entity_picture).state;
+                    id(ws).set_src(${OUT_ID}, id(art_src_ctl).c_str());
+                    id(last_art_url) = id(art_src_ctl);
+          - lambda: |-
+              lv_obj_set_style_anim_speed(id(title_lbl), 7, LV_PART_MAIN);
+              lv_obj_set_style_anim_speed(id(artist_lbl), 12, LV_PART_MAIN);
+              lv_obj_set_style_anim_speed(id(album_lbl), 8, LV_PART_MAIN);
