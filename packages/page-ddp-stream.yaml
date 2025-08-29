@@ -17,7 +17,7 @@ substitutions:
   OUT_ID: "1"
 
 external_components:
-  - source: github://stuartparmenter/lvgl-ddp-stream@v0.2.1
+  - source: github://stuartparmenter/lvgl-ddp-stream@v0.2.2
     components: [ddp_stream, ws_ddp_control]
 
 # UDP DDP sink + canvas bindings (no w/h required here)
@@ -27,6 +27,7 @@ ddp_stream:
   streams:
     - id: ${OUT_ID}
       canvas_id: "video_canvas"
+      back_buffers: 0  # 0-2
     # - id: 2
     #   canvas_id: "canvas32"
 
@@ -39,7 +40,7 @@ ws_ddp_control:
   ws_port: ${WS_DDP_PORT}
   ddp: ddp
   outputs:
-    - id: 1
+    - id: ${OUT_ID}
       src: ${DEFAULT_VIDEO_SRC}
       # width/height optional; if omitted, auto from canvas
       # width: 64
