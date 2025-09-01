@@ -1,0 +1,52 @@
+# © Copyright 2025 Stuart Parmenter
+# SPDX-License-Identifier: MIT
+
+external_components:
+  - source: github://stuartparmenter/lvgl-canvas-fx@main
+    components: [lvgl_canvas_fx]
+  # chipmunk2d-esphome is also required by lvgl-canvas-fx
+  - source: github://stuartparmenter/chipmunk2d-esphome@v0.1.0
+    components: [chipmunk2d]
+
+select:
+  - platform: template
+    id: fx_effect_select
+    name: "FX Effect"
+    optimistic: true
+    options:
+      - circle
+      - fireworks
+      - fireplace
+    initial_option: fireworks
+    set_action:
+      - lvgl_canvas_fx.set_effect:
+          id: cfx
+          effect: !lambda 'return x;'
+
+lvgl_canvas_fx:
+  - id: cfx
+    effect: fireworks  # or circle or fireplace
+    canvas: fx_canvas
+    fps: 30
+    start_paused: true
+
+lvgl:
+  pages:
+    - id: fx_page
+      widgets:
+        - canvas:
+            id: fx_canvas
+            width: ${DISPLAY_W}
+            height: ${DISPLAY_H}
+      on_load:
+        then:
+          # Keep the selected option authoritative: sync effect to current select value
+          - lvgl_canvas_fx.set_effect:
+              id: cfx
+              effect: !lambda 'return id(fx_effect_select).state;'
+          - lvgl_canvas_fx.resume:
+              id: cfx
+      on_unload:
+        then:
+          - lvgl_canvas_fx.pause:
+              id: cfx

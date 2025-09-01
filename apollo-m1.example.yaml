@@ -22,14 +22,8 @@ packages:
   # "Now Playing" media player page
   - !include packages/page-now-playing.yaml
 
-  # Fancy fireworks, but uses more memory
-  - !include packages/page-fireworks-physics.yaml
-
-  # Basic fireworks, less pretty
-  # - !include packages/page-fireworks.yaml
-
-  # Stay warm by the fire
-  - !include packages/page-fireplace.yaml
+  # Page that uses lvgl-canvas-fx to render various effects (and change which in HA)
+  - !include packages/page-fx.yaml
 
   # A classic
   - !include packages/page-pong.yaml

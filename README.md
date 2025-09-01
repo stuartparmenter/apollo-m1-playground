@@ -84,7 +84,7 @@ docker run --rm -v "${PWD}":/config -it esphome/esphome run apollo-m1/apollo-m1.
 
 - **BIOS** (`page-bios.yaml`) – chip/memory/IDF info via tiny C++ helpers in `src/page_bios.h`.
 - **Clock + Weather + Status** (`page-clock-dashboard.yaml`) – Spleen text, MDI icons; presence + alarm glyphs configurable via `PERSON_A/B` + `PERSON_A/B_ICON`.
-- **Fireworks / Fireplace** – fun pixel effects; `page_fireworks.h` is self‑contained (LVGL v8 safe).
+- **FX** – fun pixel effects; fireworks, fireplace, etc.
 - **Pong** – configurable AI, speeds, and sizes via `substitutions:`.
 - **DDP Stream** (`page-ddp-stream.yaml`) – LVGL canvas fed by a UDP DDP receiver and optional WebSocket control.  
   > ⚠️ **Note:** Requires the [lvgl-ddp-stream](https://github.com/stuartparmenter/lvgl-ddp-stream) server running on your network.
@@ -103,8 +103,10 @@ Global substitutions live in `vars.yaml` (private) and are referenced by pages. 
 
 ## External components
 
-- HUB75: `github://stuartparmenter/ESPHome-HUB75-MatrixDisplayWrapper@use-official-library`
-- DDP stream + WS control: `github://stuartparmenter/lvgl-ddp-stream@v0.1.0`
+- HUB75: `github://stuartparmenter/ESPHome-HUB75-MatrixDisplayWrapper`
+- DDP stream + WS control: `github://stuartparmenter/lvgl-ddp-stream`
+- LVGL Canvas FX: `github://stuartparmenter/lvgl-canvas-fx`
+- Chipmunk2d ESPHome: `github://stuartparmenter/chipmunk2d-esphome`
 
 > For reproducible builds, prefer **tags** or **commit SHAs** rather than a moving branch.
 
