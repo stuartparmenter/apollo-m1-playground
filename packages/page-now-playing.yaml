@@ -298,7 +298,7 @@ lvgl:
                   id: title_lbl
                   width: 100%
                   long_mode: SCROLL_CIRCULAR
-                  text: ""
+                  text: "[Title]"
                   styles: [st_spleen8, st_title_text]
 
               - obj:
@@ -311,14 +311,14 @@ lvgl:
                   id: artist_lbl
                   width: 100%
                   long_mode: SCROLL
-                  text: ""
+                  text: "[Artist]"
                   styles: [st_spleen8, st_artist_text]
 
               - label:
                   id: album_lbl
                   width: 100%
                   long_mode: SCROLL
-                  text: ""
+                  text: "[Album]"
                   styles: [st_spleen8, st_album_text]
 
               - obj:
