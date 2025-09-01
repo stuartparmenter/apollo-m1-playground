@@ -189,11 +189,14 @@ interval:
             first_run = false;
           }
 
-          // Skip calculation if no valid duration
-          if (dur <= 0.0f || std::isnan(dur)) {
+          // Only compute progress when track is playing/paused AND duration is valid
+          const bool is_playing = st == "playing";
+          const bool is_paused  = st == "paused";
+          const bool has_track  = is_playing || is_paused;
+          if (!has_track || dur <= 0.0f || std::isnan(dur)) {
+            // Reset visuals but don't log; idle/standby devices often report 0/NaN duration.
             id(media_progress_pct) = 0;
             lv_bar_set_value(id(progress_bar), 0, LV_ANIM_OFF);
-            ESP_LOGD("now_playing", "Invalid duration, setting progress to 0");
             return;
           }
 
