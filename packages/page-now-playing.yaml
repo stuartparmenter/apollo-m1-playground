@@ -14,7 +14,7 @@ substitutions:
   DEFAULT_ART_SRC: "https://placehold.co/64x64/000/FFF/png"
 
 external_components:
-  - source: github://stuartparmenter/lvgl-ddp-stream@v0.2.2
+  - source: github://stuartparmenter/lvgl-ddp-stream@v0.3.0
     components: [ddp_stream, ws_ddp_control]
 
 globals:
@@ -52,6 +52,7 @@ ws_ddp_control:
     - id: ${NP_OUT_ID}
       src: ${DEFAULT_ART_SRC}
       loop: false
+      format: rgb565
 
 # Pull metadata from Home Assistant
 text_sensor:
