@@ -103,12 +103,22 @@ button:
 # Memory reporting sensor
 sensor:
   - platform: template
-    name: "Free Heap"
+    name: "Free Heap (Internal)"
     device_class: data_size
     state_class: measurement
     unit_of_measurement: "B"
     update_interval: 5s
     lambda: |-
-      #include "esp_system.h"
-      // Bytes of free 8-bit capable heap (all allocatable heap)
-      return (float) esp_get_free_heap_size();
+      #include "esp_heap_caps.h"
+      // Bytes of free internal heap
+      return (float) heap_caps_get_free_size(MALLOC_CAP_8BIT | MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+  - platform: template
+    name: "Free Heap (PSRAM)"
+    device_class: data_size
+    state_class: measurement
+    unit_of_measurement: "KiB"
+    update_interval: 5s
+    lambda: |-
+      #include "esp_heap_caps.h"
+      // KBytes of free psram heap
+      return (float) heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024;
