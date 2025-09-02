@@ -17,6 +17,7 @@ select:
       - circle
       - fireworks
       - fireplace
+      - aurora
     initial_option: fireworks
     set_action:
       - lvgl_canvas_fx.set_effect:
