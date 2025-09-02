@@ -4,13 +4,9 @@
 esp32:
   board: esp32-s3-devkitm-1
   flash_size: 8MB
+  cpu_frequency: 240MHz
   framework:
     type: esp-idf
-
-# Not supported on rev4.  Supported on rev7
-# psram:
-#  mode: octal
-#  speed: 80MHz
 
 external_components:
   - source: github://stuartparmenter/ESPHome-HUB75-MatrixDisplayWrapper@use-official-library
@@ -48,22 +44,6 @@ display:
     LAT_pin: 47
     OE_pin: 14
     CLK_pin: 2
-
-    # Rev 7
-    # R1_pin: 1
-    # G1_pin: 5
-    # B1_pin: 6
-    # R2_pin: 7
-    # G2_pin: 13
-    # B2_pin: 9
-    # A_pin: 16
-    # B_pin: 48
-    # C_pin: 47
-    # D_pin: 21
-    # E_pin: 38
-    # LAT_pin: 8
-    # OE_pin: 4
-    # CLK_pin: 18
 
     # for LVGL
     double_buffer: false

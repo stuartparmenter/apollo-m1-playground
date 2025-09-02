@@ -8,7 +8,9 @@ packages:
   - !include vars.yaml
 
   # Base board/pins, LVGL root, services, etc.
-  - !include packages/apollo-m1-base.yaml
+  # IMPORTANT: Pick the correct one for your controller
+  - !include packages/apollo-m1-rev4.yaml
+  # - !include packages/apollo-m1-rev7.yaml
 
   # Shared fonts and LVGL styles
   - !include styles.yaml
