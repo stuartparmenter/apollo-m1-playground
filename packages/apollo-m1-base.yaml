@@ -7,8 +7,8 @@ esp32:
   framework:
     type: esp-idf
 
-# can't currently use psram on board due to pin conflicts between hub75 controller and psram
-#psram:
+# Not supported on rev4.  Supported on rev7
+# psram:
 #  mode: octal
 #  speed: 80MHz
 
@@ -32,7 +32,8 @@ display:
     #   chain_type: CHAIN_BOTTOM_RIGHT_UP   # layout mapping type
     #   scan_type: STANDARD_TWO_SCAN     # typical scan type; adjust if your panels are unusual
 
-    # Apollo Automation M-1 Rev4 Controller specific pin mappings
+    # Apollo Automation M-1 Controller specific pin mappings
+    # Rev4
     R1_pin: 42
     G1_pin: 41
     B1_pin: 40
@@ -47,6 +48,22 @@ display:
     LAT_pin: 47
     OE_pin: 14
     CLK_pin: 2
+
+    # Rev 7
+    # R1_pin: 1
+    # G1_pin: 5
+    # B1_pin: 6
+    # R2_pin: 7
+    # G2_pin: 13
+    # B2_pin: 9
+    # A_pin: 16
+    # B_pin: 48
+    # C_pin: 47
+    # D_pin: 21
+    # E_pin: 38
+    # LAT_pin: 8
+    # OE_pin: 4
+    # CLK_pin: 18
 
     # for LVGL
     double_buffer: false
