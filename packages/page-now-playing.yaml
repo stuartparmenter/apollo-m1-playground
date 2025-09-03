@@ -13,6 +13,10 @@ substitutions:
   NP_OUT_ID: "11"
   DEFAULT_ART_SRC: "https://placehold.co/64x64/000/FFF/png"
 
+esphome:
+  includes:
+    - src/text_utils.h
+
 external_components:
   - source: github://stuartparmenter/lvgl-ddp-stream@v0.3.0
     components: [ddp_stream, ws_ddp_control]
@@ -64,7 +68,7 @@ text_sensor:
     on_value:
       - lvgl.label.update:
           id: title_lbl
-          text: !lambda 'return x;'
+          text: !lambda 'auto s = normalize_media_text(x); return s.c_str();'
 
   - platform: homeassistant
     id: ha_media_artist
@@ -74,7 +78,7 @@ text_sensor:
     on_value:
       - lvgl.label.update:
           id: artist_lbl
-          text: !lambda 'return x;'
+          text: !lambda 'auto s = normalize_media_text(x); return s.c_str();'
 
   - platform: homeassistant
     id: ha_media_album
@@ -84,7 +88,7 @@ text_sensor:
     on_value:
       - lvgl.label.update:
           id: album_lbl
-          text: !lambda 'return x;'
+          text: !lambda 'auto s = normalize_media_text(x); return s.c_str();'
 
   - platform: homeassistant
     id: ha_entity_picture
@@ -94,10 +98,13 @@ text_sensor:
     on_value:
       - if:
           condition:
-            lambda: 'return id(last_art_url) != std::string(x.c_str());'
+            lambda: |-
+              auto full = normalize_ha_image_url(x, std::string("${HA_BASE_URL}"));
+              return id(last_art_url) != full;
           then:
             - lambda: |-
-                id(art_src_ctl) = std::string(x.c_str());
+                auto full = normalize_ha_image_url(x, std::string("${HA_BASE_URL}"));
+                id(art_src_ctl) = full;
                 id(ws).set_src(${NP_OUT_ID}, id(art_src_ctl).c_str());
                 id(last_art_url) = id(art_src_ctl);
 

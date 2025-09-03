@@ -1,4 +1,7 @@
 substitutions:
+  # ===== General Purpose =====
+  HA_BASE_URL: "http://homeassistant.local:8123"
+
   # ===== Display / Panel (shared) =====
   PANEL_W: "64"
   PANEL_H: "64"
