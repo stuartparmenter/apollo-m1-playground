@@ -27,6 +27,9 @@ packages:
   # Page that uses lvgl-canvas-fx to render various effects (and change which in HA)
   - !include packages/page-fx.yaml
 
+  # Microphone EQ Visualization (requires rev7 controller)
+  # - !include packages/page-eq.yaml
+
   # A classic
   - !include packages/page-pong.yaml
 

@@ -1,0 +1,121 @@
+# © 2025 Stuart Parmenter
+# SPDX-License-Identifier: MIT
+
+substitutions:
+  EQ_FS:     "16000.0" # needs to match microphone sample rate
+  EQ_FFT_N:  "512"
+
+esphome:
+  includes:
+    - src/page_eq.h
+
+# ---- Microphone Configuration ----
+# Hardware: I²S digital microphone
+#
+# Data format (verified):
+# - 24-bit samples left-justified in 32-bit words
+# - Raw values ≈ ±(0x00600000) with low 8 bits always 0x00 (padding)
+# - Convert with (raw >> 8) / 2^23
+#
+# Signal characteristics (quiet room, from logs):
+# - Time-domain RMS: typically −70 to −74 dBFS
+# - Max instantaneous amplitude: ~0.001 in silence (post-scale)
+# - Small DC/low-freq drift → high-pass required
+#
+# Processing notes:
+# - High-pass filter coefficient ~0.995 used in code
+# - sample_rate: 16000 (must match EqFftRenderer::setup fs)
+# - With fs=16 kHz and fmax_frac≈0.46–0.47, bars top out near 7.5–8 kHz
+microphone:
+  - id: !extend m1_mic
+    on_data:
+      then:
+        - lambda: |-
+            // Process audio when page is visible
+            if (id(eq_page_visible)) {
+              EqFftRenderer::process_audio(x);
+            }
+
+# ---- Global state variables ----
+globals:
+  - id: eq_page_visible
+    type: bool
+    restore_value: no
+    initial_value: "false"
+
+# ---- Helper button to bring up EQ page ----
+button:
+  - platform: template
+    name: "Show EQ Page"
+    on_press:
+      - lvgl.page.show: page_eq
+
+# ---- Rendering Interval ----
+interval:
+  - interval: 33ms  # ~30fps
+    then:
+      - if:
+          condition:
+            lambda: 'return id(eq_page_visible) && id(eq_container) != nullptr;'
+          then:
+            - lambda: |-
+                EqFftRenderer::render_bars(id(eq_container));
+
+# ---- LVGL UI ----
+lvgl:
+  pages:
+    - id: page_eq
+      bg_color: 0x000000
+      bg_opa: COVER
+      on_load:
+        - delay: 100ms  # wait for eq_container to get a size
+        - lambda: |-
+            // Call this here when parent's size is actually known to calculate optimal number of bars
+            lv_obj_t *parent = id(eq_container);
+            const int bars = EqFftRenderer::suggest_bar_count(parent,
+              7,    // bar_px
+              1,    // gap
+              8,    // min,
+              96,   // max,
+              true // round_to_multiple_of_8
+            );
+            EqFftRenderer::update_bar_count(bars);
+        - globals.set:
+            id: eq_page_visible
+            value: "true"
+        # Start mic capture (only happens if not muted)
+        - microphone.capture: m1_mic
+
+      on_unload:
+        - globals.set:
+            id: eq_page_visible
+            value: "false"
+        # Stop mic capture to save resources
+        - microphone.stop_capture: m1_mic
+
+      widgets:
+        - obj:
+            id: eq_container
+            width: 100%
+            height: 100%
+            pad_all: 0
+            bg_color: 0x000000
+            bg_opa: COVER
+            border_width: 0
+            outline_width: 0
+  
+  on_boot:
+    then:
+      - lambda: |-
+          // Initialize the FFT renderer (balanced for music)
+          EqFftRenderer::setup(
+            512,     // fft_n
+            8,       // bars
+            16000.0, // fs
+            0.022f,  // peak_decay
+            0.25f,   // smooth (a little smoother)
+            9.0f,    // gain_db
+            -55.0f,  // noise_floor_db
+            100.0f,  // fmin_hz (lets bass through)
+            0.47f    // fmax_frac (~7.5 kHz top)
+          );
