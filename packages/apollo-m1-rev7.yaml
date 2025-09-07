@@ -18,6 +18,32 @@ psram:
  mode: octal
  speed: 80MHz
 
+# ---- I²S bus for mic ----
+i2s_audio:
+  id: i2s_mic_bus
+  i2s_lrclk_pin: GPIO12
+  i2s_bclk_pin:  GPIO11
+
+# ---- Microphone Configuration ----
+# Hardware: I²S digital microphone
+#
+# Data format:
+# - 24-bit samples left-justified in 32-bit words
+# - Raw values ≈ ±(0x00600000) with low 8 bits always 0x00 (padding)
+# - Convert with (raw >> 8) / 2^23
+microphone:
+  - platform: i2s_audio
+    id: m1_mic
+    adc_type: external
+    i2s_din_pin: GPIO10
+    sample_rate: 16000
+    bits_per_sample: 32bit
+    use_apll: true
+    pdm: false
+    channel: left
+    i2s_mode: primary
+    i2s_audio_id: i2s_mic_bus
+
 external_components:
   - source: github://stuartparmenter/ESPHome-HUB75-MatrixDisplayWrapper@use-official-library
 
