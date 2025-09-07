@@ -19,7 +19,7 @@ packages:
   - !include packages/page-bios.yaml
 
   # Basic weather & clock dashboard
-  - !include packages/page-weather-clock.yaml
+  - !include packages/page-clock-dashboard.yaml
 
   # "Now Playing" media player page
   - !include packages/page-now-playing.yaml

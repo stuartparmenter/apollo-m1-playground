@@ -9,7 +9,7 @@ substitutions:
   DISPLAY_W: "64"  # Most likely ${PANEL_W} * ${DISPLAY_CHAIN_LEN}
   DISPLAY_H: "64"  # Most likely ${PANEL_H}
 
-  # ===== Weather page (page-weather-*) =====
+  # ===== Clock/Dashboard (page-clock-dashboard) =====
   WX_ENTITY: "weather.home"
   HIGH_ENTITY: "sensor.weather_today_high"
   LOW_ENTITY:  "sensor.weather_today_low"
