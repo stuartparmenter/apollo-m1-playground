@@ -37,8 +37,11 @@ packages:
   # Base board/pins, LVGL root, services, etc.
   - !include packages/apollo-m1-rev7.yaml
 
+  # Shared helpers, sensors, buttons
+  - !include packages/common-utils.yaml
+
   # Shared fonts and LVGL styles
-  - !include styles.yaml
+  - !include packages/common-theme.yaml
 
   # Pages (comment out to disable)
   - !include packages/page-bios.yaml
