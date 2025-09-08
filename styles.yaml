@@ -4,15 +4,15 @@
 # Share styles used between various packages
 
 font:
-  - file: "fonts/spleen-5x8.bdf"
+  - file: "https://github.com/fcambus/spleen/raw/refs/tags/2.1.0/spleen-5x8.bdf"
     id: spleen_8
     size: 8
 
-  - file: "fonts/spleen-6x12.bdf"
+  - file: "https://github.com/fcambus/spleen/raw/refs/tags/2.1.0/spleen-6x12.bdf"
     id: spleen_12
     size: 12
 
-  - file: "fonts/spleen-8x16.bdf"
+  - file: "https://github.com/fcambus/spleen/raw/refs/tags/2.1.0/spleen-8x16.bdf"
     id: spleen_16
     size: 16
 
