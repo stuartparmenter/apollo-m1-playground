@@ -30,12 +30,12 @@ wifi:
 captive_portal:
 
 dashboard_import:
-  package_import_url: github://stuartparmenter/apollo-m1-playground/project-template-rev7.yaml@test
+  package_import_url: github://stuartparmenter/apollo-m1-playground/project-template-rev4.yaml@test
   import_full_config: true
 
 packages:
   # Base board/pins, LVGL root, services, etc.
-  - !include packages/apollo-m1-rev7.yaml
+  - !include packages/apollo-m1-rev4.yaml
 
   # Shared helpers, sensors, buttons
   - !include packages/common-utils.yaml
@@ -52,8 +52,5 @@ packages:
   # Page that uses lvgl-canvas-fx to render various effects (and change which in HA)
   - !include packages/page-fx.yaml
 
-  # Microphone EQ Visualization
-  # - !include packages/page-eq.yaml
-
   # A classic
-  - !include packages/page-pong.yaml
+  # - !include packages/page-pong.yaml
