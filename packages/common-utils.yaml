@@ -1,0 +1,61 @@
+# © Copyright 2025 Stuart Parmenter
+# SPDX-License-Identifier: MIT
+
+# Helpers/sensors/etc
+time:
+  - platform: homeassistant
+    id: ha_time
+
+# Helper Scripts
+script:
+  - id: lvgl_next_page
+    then:
+      - lvgl.page.next:
+          animation: MOVE_LEFT
+          time: 200ms
+
+  - id: lvgl_prev_page
+    then:
+      - lvgl.page.previous:
+          animation: MOVE_RIGHT
+          time: 200ms
+
+# Home Assistant–exposed buttons that call those scripts
+button:
+  - platform: template
+    name: "LVGL Next Page"
+    icon: "mdi:page-next"
+    on_press:
+      - script.execute: lvgl_next_page
+
+  - platform: template
+    name: "LVGL Previous Page"
+    icon: "mdi:page-previous"
+    on_press:
+      - script.execute: lvgl_prev_page
+
+# Memory reporting sensor
+sensor:
+  - platform: template
+    name: "Free Heap (Internal)"
+    device_class: data_size
+    state_class: measurement
+    entity_category: diagnostic
+    unit_of_measurement: "B"
+    update_interval: 5s
+    lambda: |-
+      #include "esp_heap_caps.h"
+      // Bytes of free internal heap
+      return (float) heap_caps_get_free_size(MALLOC_CAP_8BIT | MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+
+  - platform: template
+    name: "Free Heap (PSRAM)"
+    device_class: data_size
+    state_class: measurement
+    entity_category: diagnostic
+    unit_of_measurement: "KiB"
+    update_interval: 5s
+    lambda: |-
+      #include "esp_heap_caps.h"
+      // KBytes of free psram heap
+      return (float) heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024;
