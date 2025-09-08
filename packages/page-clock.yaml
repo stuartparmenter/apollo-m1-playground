@@ -1,0 +1,65 @@
+# © Copyright 2025 Stuart Parmenter
+# SPDX-License-Identifier: MIT
+
+# ---- Simple Time + Date page ----
+lvgl:
+  pages:
+    - id: page_time_date
+      width: 100%
+      height: 100%
+      layout:
+        type: FLEX
+        flex_flow: COLUMN
+        flex_align_main: CENTER
+        flex_align_cross: CENTER
+        pad_row: 6
+      widgets:
+        - label:
+            id: lbl_time
+            width: 100%
+            text_align: CENTER
+            # render time via built-in time_format
+            text:
+              time_format: "%I:%M %p"   # 12-hour; change to "%H:%M" for 24-hour
+              time: ha_time
+        - label:
+            id: lbl_date
+            width: 100%
+            text_align: CENTER
+            text:
+              time_format: "%a, %b %d"  # e.g., Mon, Sept 8
+              time: ha_time
+
+# ---- Extend your existing time source ----
+time:
+  - id: !extend ha_time
+
+    # when we first get a valid clock, populate both labels
+    on_time_sync:
+      then:
+        - lvgl.label.update:
+            id: lbl_time
+            text:
+              time_format: "%I:%M %p"
+              time: ha_time
+        - lvgl.label.update:
+            id: lbl_date
+            text:
+              time_format: "%a, %b %d"
+              time: ha_time
+
+    # update both every minute on the minute
+    on_time:
+      - seconds: 0
+        minutes: /1
+        then:
+          - lvgl.label.update:
+              id: lbl_time
+              text:
+                time_format: "%I:%M %p"
+                time: ha_time
+          - lvgl.label.update:
+              id: lbl_date
+              text:
+                time_format: "%a, %b %d"
+                time: ha_time
