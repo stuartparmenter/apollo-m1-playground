@@ -2,8 +2,10 @@
 # SPDX-License-Identifier: MIT
 
 esphome:
-  includes:
-    - src/page_bios.h
+  platformio_options:
+    build_src_flags:
+      - -include esp_chip_info.h
+      - -include esp_mac.h
 
 wifi:
   on_connect:
@@ -39,11 +41,11 @@ interval:
           then:
             - lvgl.label.update:
                 id: boot_status
-                text: "API..."
+                text: "API."
           else:
             - lvgl.label.update:
                 id: boot_status
-                text: "WiFi..."
+                text: "WiFi."
     id: boot_check
 
 lvgl:
@@ -73,25 +75,62 @@ lvgl:
                 x: 2
                 y: 12
                 styles: [st_spleen8]
-                text: !lambda 'return bios_get_version();'
+                text: !lambda |-
+                  #include "esp_app_desc.h"
+                  const esp_app_desc_t *app_desc = esp_app_get_description();
+                  char buf[64];
+                  snprintf(buf, sizeof(buf), "VER:%s", app_desc->version);
+                  return std::string(buf);
             - label:
                 id: bios_cpu
                 x: 2
                 y: 22
                 styles: [st_spleen8]
-                text: !lambda 'return bios_cpu_string();'
+                text: !lambda |-
+                  esp_chip_info_t ci;
+                  esp_chip_info(&ci);
+                  const char *model = "ESP32";
+                  switch (ci.model) {
+                    case CHIP_ESP32:   model = "ESP32";    break;
+                    case CHIP_ESP32S2: model = "ESP32-S2"; break;
+                    case CHIP_ESP32S3: model = "ESP32-S3"; break;
+                    case CHIP_ESP32C3: model = "ESP32-C3"; break;
+                    case CHIP_ESP32C6: model = "ESP32-C6"; break;
+                    case CHIP_ESP32H2: model = "ESP32-H2"; break;
+                    default:           model = "ESP32";    break;
+                  }
+                  char buf[32];
+                  snprintf(buf, sizeof(buf), "CPU:%s", model);
+                  return std::string(buf);
             - label:
                 id: bios_mem
                 x: 2
                 y: 32
                 styles: [st_spleen8]
-                text: !lambda 'return bios_mem_string();'
+                text: !lambda |-
+                  #include "esp_heap_caps.h"
+                  size_t ram_total   = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
+                  size_t psram_total = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);  // 0 if no PSRAM
+                  char buf[32];
+                  if (psram_total > 0) {
+                    snprintf(buf, sizeof(buf), "MEM:%luk+%luk",
+                             (unsigned long)(ram_total / 1024),
+                             (unsigned long)(psram_total / 1024));
+                  } else {
+                    snprintf(buf, sizeof(buf), "MEM:%luk", (unsigned long)(ram_total / 1024));
+                  }
+                  return std::string(buf);
             - label:
                 id: bios_id
                 x: 2
                 y: 42
                 styles: [st_spleen8]
-                text: !lambda 'return bios_id_string();'
+                text: !lambda |-
+                  uint8_t mac[6] = {0};
+                  esp_read_mac(mac, ESP_MAC_WIFI_STA);
+                  char buf[32];
+                  snprintf(buf, sizeof(buf), "ID:%02X%02X%02X", mac[3], mac[4], mac[5]);
+                  return std::string(buf);
             - label:
                 id: boot_status
                 align: TOP_MID
