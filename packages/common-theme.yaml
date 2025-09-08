@@ -30,3 +30,13 @@ lvgl:
     - id: st_spleen16
       text_font: spleen_16
       text_color: white
+
+  # Screen (display) background behind everything
+  disp_bg_color: black
+
+  # Make Spleen 8 the default font everywhere
+  default_font: spleen_8
+
+  # Global defaults for *all* widgets
+  bg_color: black
+  text_color: white
