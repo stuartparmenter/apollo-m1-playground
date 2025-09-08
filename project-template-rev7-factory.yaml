@@ -5,8 +5,8 @@ substitutions:
   # ===== Display / Panel =====
   PANEL_W: "64"
   PANEL_H: "64"
-  DISPLAY_CHAIN_LEN: "2" # Total number of panels you have connected
-  DISPLAY_W: "128" # Most likely ${PANEL_W} * ${DISPLAY_CHAIN_LEN}
+  DISPLAY_CHAIN_LEN: "1" # Total number of panels you have connected
+  DISPLAY_W: "64" # Most likely ${PANEL_W} * ${DISPLAY_CHAIN_LEN}
   DISPLAY_H: "64"  # Most likely ${PANEL_H}
 
 esphome:
@@ -15,7 +15,7 @@ esphome:
   name_add_mac_suffix: true
   project:
     name: stuartparmenter.apollo-m1-playground
-    version: "0.3"
+    version: dev
 
 logger:
 
