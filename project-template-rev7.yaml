@@ -49,3 +49,12 @@ packages:
 
   # Pages (comment out to disable)
   - !include packages/page-bios.yaml
+
+  # Page that uses lvgl-canvas-fx to render various effects (and change which in HA)
+  - !include packages/page-fx.yaml
+
+  # Microphone EQ Visualization
+  # - !include packages/page-eq.yaml
+
+  # A classic
+  - !include packages/page-pong.yaml
