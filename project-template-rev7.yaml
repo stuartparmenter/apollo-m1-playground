@@ -1,0 +1,47 @@
+substitutions:
+  name: "apollo-m-1"
+  friendly_name: "Apollo M-1"
+
+esphome:
+  name: "${name}"
+  friendly_name: "${friendly_name}"
+  name_add_mac_suffix: true
+  project:
+    name: stuartparmenter.apollo-m1-playground
+    version: "0.3"
+
+logger:
+
+api:
+
+ota:
+  platform: esphome
+
+dashboard_import:
+  package_import_url: github://stuartparmenter/apollo-m1-playground/project-template-rev7.yaml@test
+  import_full_config: false # or true
+
+wifi:
+  ap:
+    password: "12345678"
+
+captive_portal:
+
+esp32_improv:
+  authorizer: none
+
+improv_serial:
+  # next_url: https://example.com/project-template/manual?ip={{ip_address}}&name={{device_name}}&version={{esphome_version}}
+
+packages:
+  # Includes your substitution values
+  - !include vars.yaml
+
+  # Base board/pins, LVGL root, services, etc.
+  - !include packages/apollo-m1-rev7.yaml
+
+  # Shared fonts and LVGL styles
+  - !include styles.yaml
+
+  # Pages (comment out to disable)
+  - !include packages/page-bios.yaml
