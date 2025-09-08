@@ -6,7 +6,7 @@ substitutions:
   PANEL_W: "64"
   PANEL_H: "64"
   DISPLAY_CHAIN_LEN: "1" # Total number of panels you have connected
-  DISPLAY_W: "64" # Most likely ${PANEL_W} * ${DISPLAY_CHAIN_LEN}
+  DISPLAY_W: "64"  # Most likely ${PANEL_W} * ${DISPLAY_CHAIN_LEN}
   DISPLAY_H: "64"  # Most likely ${PANEL_H}
 
 esphome:
@@ -30,7 +30,7 @@ wifi:
 captive_portal:
 
 dashboard_import:
-  package_import_url: github://stuartparmenter/apollo-m1-playground/project-template-rev7.yaml@test
+  package_import_url: github://stuartparmenter/apollo-m1-playground/project-template-rev7.yaml@main
   import_full_config: true
 
 packages:

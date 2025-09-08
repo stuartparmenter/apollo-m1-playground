@@ -30,7 +30,7 @@ wifi:
 captive_portal:
 
 dashboard_import:
-  package_import_url: github://stuartparmenter/apollo-m1-playground/project-template-rev7.yaml@test
+  package_import_url: github://stuartparmenter/apollo-m1-playground/project-template-rev7.yaml@main
   import_full_config: true
 
 packages:
