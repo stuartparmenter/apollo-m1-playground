@@ -51,3 +51,11 @@ packages:
 
   # A classic
   - !include packages/page-pong.yaml
+
+#
+# Below is included only in the factory firmware to make provisioning easier
+#
+esp32_improv:
+  authorizer: none
+
+improv_serial:
