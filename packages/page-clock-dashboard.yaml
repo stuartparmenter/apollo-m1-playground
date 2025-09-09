@@ -5,11 +5,11 @@
 # Clock + Weather + Home Status (64x64)
 # =========================
 substitutions:
+  UNITS: "°"
   # vars.yaml provides:
   # WX_ENTITY: "weather.home"
   # HIGH_ENTITY: "sensor.weather_today_high"
   # LOW_ENTITY:  "sensor.weather_today_low"
-  # UNITS: "°"
   # ALARM_ENTITY: "alarm_control_panel.example_alarm"
   # PERSON_A: "person.person_a"
   # PERSON_B: "person.person_b"
