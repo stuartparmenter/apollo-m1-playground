@@ -10,14 +10,16 @@ permissions:
 jobs:
   build-firmware:
     name: Build Firmware
+    strategy:
+      fail-fast: false
+      matrix:
+        suffix: [rev4, rev7]
     uses: esphome/workflows/.github/workflows/build.yml@2025.8.1
     with:
       #### Modify below here to match your project ####
-      files: |
-        project-template-rev4.factory.yaml
-        project-template-rev7.factory.yaml
+      files: project-template-${{ matrix.suffix }}.factory.yaml
       esphome-version: 2025.8.0
-      combined-name: project-template
+      combined-name: project-template-${{ matrix.suffix }}
       #### Modify above here to match your project ####
 
       release-summary: ${{ github.event.release.body }}
