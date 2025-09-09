@@ -1,3 +1,8 @@
+external_components:
+  - source: github://pr#10655
+    components: [dashboard_import]
+    refresh: 1h
+
 substitutions:
   name: "apollo-m1-r7"
   friendly_name: "Apollo M-1"
