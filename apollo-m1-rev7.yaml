@@ -7,6 +7,16 @@ substitutions:
   DISPLAY_W: "64"  # Most likely 64 * ${DISPLAY_CHAIN_LEN}
   DISPLAY_H: "64"  # Most likely 64
 
+  # ===== DDP/WS Stream (used by Now Playing & DDP pages) =====
+  WS_DDP_HOST: "192.168.1.200"
+  WS_DDP_PORT: "8788"
+  DDP_PORT: "4048"
+
+  # ===== MSR2 Radar Screen (has to be up here because of how it is used in the page) =====
+  # MSR2_PREFIX: "apollo_msr_2_xxxxxx"
+
+  # Note: some variables need to be configured at the page level down below
+
 esphome:
   name: "${name}"
   friendly_name: "${friendly_name}"
@@ -46,14 +56,41 @@ packages:
       # Simple clock page
       - path: packages/page-clock.yaml
 
+      # Clock weather / dashboard
+      - path: packages/page-clock-dashboard.yaml
+        vars:
+          WX_ENTITY: "weather.home"
+          HIGH_ENTITY: "sensor.weather_today_high"
+          LOW_ENTITY:  "sensor.weather_today_low"
+          ALARM_ENTITY: "alarm_control_panel.example_alarm"
+          PERSON_A: "person.person_a"
+          PERSON_B: "person.person_b"
+          PERSON_A_ICON: "\U000F040A"  # account-circle
+          PERSON_B_ICON: "\U000F0B8F"  # account-circle-outline
+
+      # "Now Playing" media player page
+      # - path: packages/page-now-playing.yaml
+      #   vars:
+      #     HA_BASE_URL: "http://homeassistant.local:8123"  # Used to get preview images
+      #     MEDIA_PLAYER_ENTITY: "media_player.your_media_player"
+
       # Page that uses lvgl-canvas-fx to render various effects (and change which in HA)
       - path: packages/page-fx.yaml
 
       # Microphone EQ Visualization
-      # - !include packages/page-eq.yaml
+      # - path: packages/page-eq.yaml
 
       # A classic
       - path: packages/page-pong.yaml
+
+      # Visualize your Apollo Automation MSR-2
+      # - path: packages/page-msr-2-radar.yaml
+
+      # DDP video streaming
+      - path: packages/page-ddp-stream.yaml
+        vars:
+          DEFAULT_VIDEO_SRC: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+
 
 # If you want to support non-horizontal layouts, you can uncomment this section below:
 # display:
