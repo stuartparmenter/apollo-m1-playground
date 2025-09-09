@@ -1,0 +1,66 @@
+substitutions:
+  name: "apollo-m1-r7"
+  friendly_name: "Apollo M-1"
+
+  # ===== Display / Panel =====
+  DISPLAY_CHAIN_LEN: "1" # Total number of panels you have connected
+  DISPLAY_W: "64"  # Most likely 64 * ${DISPLAY_CHAIN_LEN}
+  DISPLAY_H: "64"  # Most likely 64
+
+esphome:
+  name: "${name}"
+  friendly_name: "${friendly_name}"
+  name_add_mac_suffix: true
+
+logger:
+
+api:
+
+ota:
+  platform: esphome
+
+wifi:
+  power_save_mode: none
+  ap:
+
+captive_portal:
+
+packages:
+  remote_package_files:
+    url: https://github.com/stuartparmenter/apollo-m1-playground
+    ref: main
+    refresh: 0s
+    files:
+      # Base board/pins, LVGL root, services, etc.
+      - path: packages/controller-rev7.yaml
+
+      # Shared helpers, sensors, buttons
+      - path: packages/common-utils.yaml
+
+      # Shared fonts and LVGL styles
+      - path: packages/common-theme.yaml
+
+      # Basic Boot Screen to avoid flashing or things not being ready yet
+      - path: packages/page-bios.yaml
+
+      # Simple clock page
+      - path: packages/page-clock.yaml
+
+      # Page that uses lvgl-canvas-fx to render various effects (and change which in HA)
+      - path: packages/page-fx.yaml
+
+      # Microphone EQ Visualization
+      # - !include packages/page-eq.yaml
+
+      # A classic
+      - path: packages/page-pong.yaml
+
+# If you want to support non-horizontal layouts, you can uncomment this section below:
+# display:
+#   - id: !extend matrix
+#     virtual_matrix:
+#       enabled: true
+#       rows: 2           # number of panel rows
+#       cols: 1           # number of panel columns
+#       chain_type: CHAIN_BOTTOM_RIGHT_UP   # layout mapping type
+#       scan_type: STANDARD_TWO_SCAN        # typical scan type; adjust if your panels are unusual

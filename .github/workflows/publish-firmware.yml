@@ -17,9 +17,9 @@ jobs:
     uses: esphome/workflows/.github/workflows/build.yml@2025.8.1
     with:
       #### Modify below here to match your project ####
-      files: project-template-${{ matrix.suffix }}.factory.yaml
+      files: apollo-m1-${{ matrix.suffix }}.factory.yaml
       esphome-version: 2025.8.0
-      combined-name: project-template-${{ matrix.suffix }}
+      combined-name: apollo-m1-${{ matrix.suffix }}
       #### Modify above here to match your project ####
 
       release-summary: ${{ github.event.release.body }}

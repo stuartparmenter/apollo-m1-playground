@@ -22,8 +22,8 @@ jobs:
       matrix:
         #### Modify below here to match your project ####
         file:
-          - project-template-rev4
-          - project-template-rev7
+          - apollo-m1-rev4
+          - apollo-m1-rev7
         #### Modify above here to match your project ####
 
         esphome-version:

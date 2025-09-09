@@ -1,6 +1,10 @@
 # © Copyright 2025 Stuart Parmenter
 # SPDX-License-Identifier: MIT
 
+substitutions:
+  PANEL_W: "64"
+  PANEL_H: "64"
+
 esp32:
   board: esp32-s3-devkitc-1
   flash_size: 16MB
@@ -20,13 +24,6 @@ display:
     clock_phase: false # fixes off by 1 issue
     latch_blanking: 1
     i2sspeed: HZ_20M
-
-    # virtual_matrix:
-    #   enabled: true
-    #   rows: 2           # number of panel rows
-    #   cols: 1           # number of panel columns
-    #   chain_type: CHAIN_BOTTOM_RIGHT_UP   # layout mapping type
-    #   scan_type: STANDARD_TWO_SCAN     # typical scan type; adjust if your panels are unusual
 
     # Apollo Automation M-1 Controller specific pin mappings
     # Rev4
