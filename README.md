@@ -1,141 +1,126 @@
 # Apollo M‑1 Playground
 
-ESPHome (ESP‑IDF) playground for the Apollo M‑1 HUB75 controller — base config, dashboards, effects, and example “apps”.
+ESPHome (ESP‑IDF) playground for the Apollo M‑1 HUB75 controller — base config, reusable LVGL pages/effects, and small example “apps.” Targets **ESPHome 2025.8.x** on **ESP‑IDF** (Arduino is not supported).
 
-This repo contains ESPHome configs for the **Apollo M‑1 (rev1)** HUB75 controller, plus bundled fonts and reusable LVGL pages. It targets **ESPHome 2025.8** on **ESP‑IDF** (Arduino is not supported).
+---
 
-> **Rev2 note:** a future *rev2* controller board will have different pins. Will add a new base file when I get the hardware.
+## What’s new (Sept 2025)
+- **Refactor:** example templates removed. Two factory configs now cover hardware revisions.
+- **Releases:** GitHub Actions builds **pre‑compiled firmware** for **rev4** and **rev7** on every tagged release.
+- **On‑device config:** After adoption, all tunable variables live in the ESPHome Dashboard (Builder) for that device.
+
+---
+
+## Hardware revisions
+Pick the file/firmware that matches your controller:
+- **rev4:** `apollo-m1/apollo-m1-rev4.factory.yaml`
+- **rev7:** `apollo-m1/apollo-m1-rev7.factory.yaml`
+
+> GitHub Releases provide prebuilt binaries for these **factory** files. After you **Adopt** the device in ESPHome Builder, it will generate a device config from `apollo-m1-rev4.yaml` or `apollo-m1-rev7.yaml`.
+
+---
+
+## Flash prebuilt firmware (no local toolchain)
+1. Go to **[Releases](/stuartparmenter/apollo-m1-playground/releases)** and download the correct **`apollo-m1-rev[4|7]`** firmware asset for your controller.
+2. Open **https://web.esphome.io/** and connect your device via USB.
+3. Click Install and select the downloaded firmware and flash.
+4. When prompted, set Wi‑Fi credentials. The device will reboot and announce itself on the network.  If not prompted, click the 3 dots to set wifi.
+5. Add it to **Home Assistant** (it will be auto‑discovered) or **Adopt** it in the ESPHome Dashboard.
+
+---
+
+## Build & flash locally (developers)
+Requires **ESPHome 2025.8.x** with the **ESP‑IDF** toolchain.
+
+**pip + venv (recommended)**
+```bash
+python3 -m venv .venv
+source .venv/bin/activate        # Linux/macOS
+# .venv\Scripts\activate        # Windows PowerShell
+pip install "esphome>=2025.8,<2025.9"
+
+# Build & upload (USB or OTA)
+esphome run apollo-m1/apollo-m1-rev4.factory.yaml
+# or
+esphome run apollo-m1/apollo-m1-rev7.factory.yaml
+```
+
+**Docker**
+```bash
+docker run --rm -it -v "$PWD":/config esphome/esphome run apollo-m1/apollo-m1-rev7.factory.yaml
+```
+
+---
+
+## Configure after adoption
+All user‑tunable settings are exposed in the **ESPHome Dashboard** for your device (ESPHome Builder fields / substitutions). Typical options include:
+- Display size and layout
+- Weather entities and units
+- Presence / alarm entities
+- DDP / WebSocket streaming host/ports
+- Device‑specific toggles for pages/effects
+
+> Keep personal entity IDs and secrets in your local device config inside ESPHome; they’re **not** tracked in this repo.
 
 ---
 
 ## Repository layout
-
 ```
 apollo-m1/
-├─ apollo-m1.example.yaml      # template device config (includes base + styles + pages)
-├─ vars.example.yaml           # safe defaults for substitutions
-├─ secrets.example.yaml        # template for your secrets
-├─ styles.yaml                 # shared fonts + LVGL styles (only Spleen fonts for text)
-├─ packages/                   # drop‑in packages and LVGL pages
-├─ src/                        # small C++ helpers used by pages
-├─ fonts/                      # fonts used by LVGL pages
-├─ LICENSE                     # MIT
-└─ THIRD_PARTY_LICENSES.md     # font/icon licenses
-```
-
----
-
-## Quick start
-
-1. **Copy templates**
-   ```bash
-   cp apollo-m1-playground/vars.example.yaml apollo-m1-playground/vars.yaml
-   cp apollo-m1-playground/secrets.example.yaml apollo-m1-playground/secrets.yaml
-   cp apollo-m1-playground/apollo-m1.example.yaml apollo-m1-playground/apollo-m1.yaml
-   ```
-
-2. **Edit `vars.yaml`**
-   - Display size: `DISPLAY_W`, `DISPLAY_H`
-   - Weather entities: `WX_ENTITY`, `HIGH_ENTITY`, `LOW_ENTITY`, `UNITS`
-   - Presence/security: `PERSON_A`, `PERSON_B`, `ALARM_ENTITY`
-   - DDP/WebSocket streaming: `WS_DPP_HOST`, `WS_DPP_PORT`, `DDP_PORT`
-   - MSR‑2 radar prefix: `MSR2_PREFIX`
-
-3. **Edit `secrets.yaml`**
-   - Wifi, HA API, etc.
-
-34 **Edit `apollo-m1.yaml`** if you want to remove or add pages: just comment out or delete the `!include packages/page-*.yaml` lines.
-
-5. **Build/flash with ESPHome**
-   ```bash
-   esphome run apollo-m1/apollo-m1.yaml
-   ```
-
----
-
-## Build & Flash
-
-You need **ESPHome ≥2025.8** with **ESP‑IDF** toolchain (Arduino is not supported).
-
-### Option 1: pip + venv (recommended)
-
-```bash
-# Create a fresh virtualenv
-python3 -m venv .venv
-source .venv/bin/activate  # (Linux/macOS)
-# .venv\Scripts\activate   # (Windows PowerShell)
-
-# Install the pinned ESPHome version
-pip install esphome==2025.8.0
-
-# Build & upload (USB or OTA)
-esphome run apollo-m1/apollo-m1.yaml
-```
-
-### Option 2: Docker
-
-```bash
-docker run --rm -v "${PWD}":/config -it esphome/esphome run apollo-m1/apollo-m1.yaml
+├─ apollo-m1-rev4.factory.yaml     # Factory config for rev4 (CI builds this)
+├─ apollo-m1-rev7.factory.yaml     # Factory config for rev7 (CI builds this)
+├─ packages/common-theme.yaml      # Shared LVGL theme (default font + colors)
+├─ packages/                       # Drop‑in LVGL pages/effects
+├─ src/                            # Small C/C++ helpers used by pages
+├─ fonts/                          # Icon fonts used by pages
+├─ .github/workflows/              # CI that builds release firmware (rev4 & rev7)
+├─ LICENSE                         # MIT
+└─ THIRD_PARTY_LICENSES.md         # Font/icon licenses
 ```
 
 ---
 
 ## Pages overview
-
-- **BIOS** (`page-bios.yaml`) – chip/memory/IDF info via tiny C++ helpers in `src/page_bios.h`.
-- **Clock + Weather + Status** (`page-clock-dashboard.yaml`) – Spleen text, MDI icons; presence + alarm glyphs configurable via `PERSON_A/B` + `PERSON_A/B_ICON`.
-- **FX** – fun pixel effects; fireworks, fireplace, etc.
-- **Pong** – configurable AI, speeds, and sizes via `substitutions:`.
-- **DDP Stream** (`page-ddp-stream.yaml`) – LVGL canvas fed by a UDP DDP receiver and optional WebSocket control.  
+- **BIOS** — chip/memory/IDF info via tiny C++ helpers.
+- **Clock • Weather • Status** — Spleen text + Material Design Icons.
+- **FX** — fireworks, fireplace, and other LVGL canvas effects.
+- **Pong** — configurable AI/speeds/sizes via substitutions.
+- **DDP Stream** — LVGL canvas fed by a UDP DDP receiver + optional WebSocket control.  
   > ⚠️ **Note:** Requires the [lvgl-ddp-stream](https://github.com/stuartparmenter/lvgl-ddp-stream) server running on your network.
-- **MSR‑2 Radar** – pulls HA entities by `MSR2_PREFIX` and renders sweep/targets/LEDs.
-
----
-
-## Configuration & substitutions
-
-Global substitutions live in `vars.yaml` (private) and are referenced by pages. Page‑local knobs are defined inside each page `substitutions:` section.
-
-- Keep personal Home Assistant entity IDs (e.g., `person.*`, `alarm_control_panel.*`) **in `vars.yaml`**, not inside tracked files.
-- The DDP/WebSocket host (`WS_DPP_HOST`) is typically a LAN IP or hostname—don’t hardcode it in page YAMLs.
+- **MSR‑2 Radar** — renders sweep/targets/LEDs based on HA entities.
+- **Microphone / Music Visualizer** — real‑time FFT bars and peaks driven by the on‑board mic.
 
 ---
 
 ## External components
-
 - HUB75: `github://stuartparmenter/ESPHome-HUB75-MatrixDisplayWrapper`
 - DDP stream + WS control: `github://stuartparmenter/lvgl-ddp-stream`
 - LVGL Canvas FX: `github://stuartparmenter/lvgl-canvas-fx`
-- Chipmunk2d ESPHome: `github://stuartparmenter/chipmunk2d-esphome`
+- Chipmunk2D ESPHome: `github://stuartparmenter/chipmunk2d-esphome`
 
 > For reproducible builds, prefer **tags** or **commit SHAs** rather than a moving branch.
 
 ---
 
 ## ESP‑IDF notes
-
-- This project uses **ESP‑IDF** only; components and `#include`s are IDF‑safe (no Arduino headers).
-- PSRAM is currently disabled because of HUB75 pin conflicts on the target board (see comments in `apollo-m1-base.yaml`).
+- This project is **ESP‑IDF only**; avoid Arduino headers.
+- **Memory:** rev7 boards use PSRAM; rev4 boards do not. The correct factory file handles this automatically—no manual toggles needed.
 
 ---
 
-## Contributing
-
-- Keep new pages under `packages/` with the `page-*.yaml` naming.
-- C/C++ helpers go in `src/` as `page_*.h`/`.cpp`.
-- Stick to Spleen fonts for text; if you need icons, prefer MDI glyphs (add glyphs explicitly).
+## Troubleshooting
+- **Device not found in HA:** Power‑cycle, ensure Wi‑Fi credentials were set during flashing.
+- **Picked the wrong revision:** Re‑flash with the correct `rev4` or `rev7` factory firmware.
+- **USB permissions (Linux):** Add user to dialout/plugdev or use `udev` rules.
 
 ---
 
 ## Security & privacy
-
-- Never commit `secrets.yaml`, `vars.yaml`, or `apollo-m1.yaml`.
-- Avoid real IPs, SSIDs, or personal entity IDs in tracked files and docs. Use placeholders or `substitutions:` examples.
-- If you open issues, strip logs of IPs/MACs and tokens.
+- Don’t commit secrets or personal entity IDs.
+- Strip IPs/MACs/tokens from logs when filing issues.
 
 ---
 
 ## License
-
-- Code and configs: **MIT** (see `LICENSE`).
-- Fonts and icons: see `THIRD_PARTY_LICENSES.md`.
+- Code & configs: **MIT**
+- Fonts & icons: see `THIRD_PARTY_LICENSES.md`
