@@ -183,8 +183,7 @@ script:
 
 # -------- Time (updates every minute) --------
 time:
-  - platform: homeassistant
-    id: ha_time
+  - id: !extend ha_time
     # Fires when HA time becomes available (and on any resync)
     on_time_sync:
       then:
