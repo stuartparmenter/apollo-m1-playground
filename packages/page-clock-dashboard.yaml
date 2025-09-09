@@ -18,7 +18,7 @@ substitutions:
 
 # --- Weather icon fonts (icons only; all text uses Spleen from styles.yaml) ---
 font:
-  - file: "fonts/materialdesignicons-webfont.ttf"
+  - file: "https://github.com/stuartparmenter/apollo-m1-playground/raw/refs/heads/main/fonts/materialdesignicons-webfont.ttf"
     id: mdi_26
     size: 26
     glyphs: [
@@ -31,7 +31,7 @@ font:
       "\U000F0594",  # clear-night
       "\U000F0598"   # snowy
     ]
-  - file: "fonts/materialdesignicons-webfont.ttf"
+  - file: "https://github.com/stuartparmenter/apollo-m1-playground/raw/refs/heads/main/fonts/materialdesignicons-webfont.ttf"
     id: mdi_12
     size: 12
     glyphs: [
