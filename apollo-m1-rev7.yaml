@@ -77,7 +77,7 @@ packages:
       # Page that uses lvgl-canvas-fx to render various effects (and change which in HA)
       - path: packages/page-fx.yaml
 
-      # Page that uses lvgl-canvas-fx to render audio from the microphone as audio specrum bars
+      # Page that uses lvgl-canvas-fx to render audio from the microphone as audio spectrum bars
       - path: packages/page-audio-spectrum.yaml
 
       # A classic
