@@ -1,6 +1,6 @@
 # About
 
-ESPHome based firmware for the Apollo M‑1 HUB75 controller.  Contains some basic screens and lets you adopt it in ESPHome Builder in Home Assistant for additional pages, customization, etc.
+ESPHome based firmware for the Apollo Automation M‑1 HUB75 controller.  Contains some basic screens and lets you adopt it in ESPHome Builder in Home Assistant for additional pages, customization, etc.
 
 # Installation
 
