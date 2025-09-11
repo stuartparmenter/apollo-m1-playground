@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 external_components:
-  - source: github://stuartparmenter/lvgl-canvas-fx@main
+  - source: github://stuartparmenter/lvgl-canvas-fx@v0.2.0
     components: [lvgl_canvas_fx]
   # chipmunk2d-esphome is also required by lvgl-canvas-fx
   - source: github://stuartparmenter/chipmunk2d-esphome@v0.1.0

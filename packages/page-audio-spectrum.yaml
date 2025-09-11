@@ -1,0 +1,59 @@
+# © Copyright 2025 Stuart Parmenter
+# SPDX-License-Identifier: MIT
+
+external_components:
+  - source: github://stuartparmenter/lvgl-canvas-fx@v0.2.0
+    components: [lvgl_canvas_fx]
+  # chipmunk2d-esphome is also required by lvgl-canvas-fx
+  - source: github://stuartparmenter/chipmunk2d-esphome@v0.1.0
+    components: [chipmunk2d]
+
+# ---- Microphone Configuration ----
+# Hardware: I²S digital microphone
+#
+# Data format (verified):
+# - 24-bit samples left-justified in 32-bit words
+# - Raw values ≈ ±(0x00600000) with low 8 bits always 0x00 (padding)
+# - Convert with (raw >> 8) / 2^23
+#
+# Signal characteristics (quiet room, from logs):
+# - Time-domain RMS: typically −70 to −74 dBFS
+# - Max instantaneous amplitude: ~0.001 in silence (post-scale)
+# - Small DC/low-freq drift → high-pass required
+#
+# Processing notes:
+# - High-pass filter coefficient ~0.995 used in code
+# - sample_rate: 16000 (must match EqFftRenderer::setup fs)
+# - With fs=16 kHz and fmax_frac≈0.46–0.47, bars top out near 7.5–8 kHz
+microphone:
+  - id: !extend m1_mic
+    on_data:
+      then:
+        - lambda: |-
+            id(cfx_as).submit_data(x.data(), x.size());
+
+lvgl_canvas_fx:
+  - id: cfx_as
+    effect: audio_spectrum
+    canvas: fx_as_canvas
+    fps: 30
+    start_paused: true
+
+lvgl:
+  pages:
+    - id: fx_as_page
+      widgets:
+        - canvas:
+            id: fx_as_canvas
+            width: ${DISPLAY_W}
+            height: ${DISPLAY_H}
+      on_load:
+        then:
+          - lvgl_canvas_fx.resume:
+              id: cfx_as
+          - microphone.capture: m1_mic
+      on_unload:
+        then:
+          - lvgl_canvas_fx.pause:
+              id: cfx_as
+          - microphone.stop_capture: m1_mic
