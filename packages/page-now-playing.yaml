@@ -13,9 +13,72 @@ substitutions:
   NP_OUT_ID: "11"
   DEFAULT_ART_SRC: "https://placehold.co/64x64/000/FFF/png"
 
-esphome:
-  includes:
-    - src/text_utils.h
+script:
+  - id: np_set_label_text_normalized
+    mode: restart
+    parameters:
+      widget: lv_obj_t*
+      text: string
+      simplify_unicode: bool
+    then:
+      - lambda: |-
+          auto rep_all = [](std::string &s, const char *from, const char *to) {
+            const size_t flen = std::strlen(from);
+            const size_t tlen = std::strlen(to);
+            if (flen == 0) return;
+            size_t pos = 0;
+            while ((pos = s.find(from, pos)) != std::string::npos) {
+              s.replace(pos, flen, to);
+              pos += tlen;
+            }
+          };
+          auto normalize_media_text = [&](std::string s) -> std::string {
+            if (!simplify_unicode) return s;
+            rep_all(s, "\xE2\x80\x99", "'");
+            rep_all(s, "\xE2\x80\x98", "'");
+            rep_all(s, "\xCA\xBC",     "'");
+            rep_all(s, "\xE2\x80\x9C", "\"");
+            rep_all(s, "\xE2\x80\x9D", "\"");
+            rep_all(s, "\xE2\x80\x93", "-");
+            rep_all(s, "\xE2\x80\x94", "-");
+            rep_all(s, "\xE2\x80\xA6", "...");
+            rep_all(s, "\xC2\xA0", " ");
+            rep_all(s, "\xE2\x84\xA2", "");
+            rep_all(s, "\xC2\xAE",    "");
+            rep_all(s, "\xC3\xA9","e"); rep_all(s, "\xC3\xA8","e"); rep_all(s, "\xC3\xAA","e"); rep_all(s, "\xC3\xAB","e");
+            rep_all(s, "\xC3\xA1","a"); rep_all(s, "\xC3\xA0","a"); rep_all(s, "\xC3\xA4","a"); rep_all(s, "\xC3\xA2","a");
+            rep_all(s, "\xC3\xAD","i"); rep_all(s, "\xC3\xAC","i"); rep_all(s, "\xC3\xAF","i"); rep_all(s, "\xC3\xAE","i");
+            rep_all(s, "\xC3\xB3","o"); rep_all(s, "\xC3\xB2","o"); rep_all(s, "\xC3\xB6","o"); rep_all(s, "\xC3\xB4","o"); rep_all(s, "\xC3\xB8","o");
+            rep_all(s, "\xC3\xBA","u"); rep_all(s, "\xC3\xB9","u"); rep_all(s, "\xC3\xBC","u"); rep_all(s, "\xC3\xBB","u");
+            rep_all(s, "\xC3\xB1","n");
+            rep_all(s, "\xC3\xA7","c");
+            rep_all(s, "\xC3\x9F","ss");
+            return s;
+          };
+          std::string out = normalize_media_text(text);
+          lv_label_set_text((lv_obj_t*)widget, out.c_str());
+
+  - id: np_set_art_src_resolved
+    mode: restart
+    parameters:
+      path_or_url: string
+      base: string
+    then:
+      - lambda: |-
+          auto normalize_ha_image_url = [](const std::string &in, const std::string &base) -> std::string {
+            if (in.rfind("http://", 0) == 0 || in.rfind("https://", 0) == 0) return in;
+            if (in.empty()) return base;
+            const bool base_has_slash = !base.empty() && base.back() == '/';
+            const bool path_has_slash = !in.empty() && in.front() == '/';
+            if (base_has_slash && path_has_slash) return base.substr(0, base.size() - 1) + in;
+            if (!base_has_slash && !path_has_slash) return base + "/" + in;
+            return base + in;
+          };
+          std::string full = normalize_ha_image_url(path_or_url, base);
+          if (id(last_art_url) == full) return;
+          id(art_src_ctl) = full;
+          id(ws).set_src(${NP_OUT_ID}, id(art_src_ctl).c_str());
+          id(last_art_url) = id(art_src_ctl);
 
 external_components:
   - source: github://stuartparmenter/lvgl-ddp-stream@v0.3.0
@@ -66,9 +129,11 @@ text_sensor:
     attribute: media_title
     internal: true
     on_value:
-      - lvgl.label.update:
-          id: title_lbl
-          text: !lambda 'auto s = normalize_media_text(x); return s.c_str();'
+      - script.execute:
+          id: np_set_label_text_normalized
+          widget: !lambda 'return id(title_lbl);'
+          text: !lambda 'return x.c_str();'
+          simplify_unicode: true
 
   - platform: homeassistant
     id: ha_media_artist
@@ -76,9 +141,11 @@ text_sensor:
     attribute: media_artist
     internal: true
     on_value:
-      - lvgl.label.update:
-          id: artist_lbl
-          text: !lambda 'auto s = normalize_media_text(x); return s.c_str();'
+      - script.execute:
+          id: np_set_label_text_normalized
+          widget: !lambda 'return id(artist_lbl);'
+          text: !lambda 'return x.c_str();'
+          simplify_unicode: true
 
   - platform: homeassistant
     id: ha_media_album
@@ -86,9 +153,11 @@ text_sensor:
     attribute: media_album_name
     internal: true
     on_value:
-      - lvgl.label.update:
-          id: album_lbl
-          text: !lambda 'auto s = normalize_media_text(x); return s.c_str();'
+      - script.execute:
+          id: np_set_label_text_normalized
+          widget: !lambda 'return id(album_lbl);'
+          text: !lambda 'return x.c_str();'
+          simplify_unicode: true
 
   - platform: homeassistant
     id: ha_entity_picture
@@ -96,17 +165,10 @@ text_sensor:
     attribute: entity_picture
     internal: true
     on_value:
-      - if:
-          condition:
-            lambda: |-
-              auto full = normalize_ha_image_url(x, std::string("${HA_BASE_URL}"));
-              return id(last_art_url) != full;
-          then:
-            - lambda: |-
-                auto full = normalize_ha_image_url(x, std::string("${HA_BASE_URL}"));
-                id(art_src_ctl) = full;
-                id(ws).set_src(${NP_OUT_ID}, id(art_src_ctl).c_str());
-                id(last_art_url) = id(art_src_ctl);
+      - script.execute:
+          id: np_set_art_src_resolved
+          path_or_url: !lambda 'return x.c_str();'
+          base: ${HA_BASE_URL}
 
   - platform: homeassistant
     id: ha_media_state
