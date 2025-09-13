@@ -12,9 +12,6 @@ substitutions:
   WS_DDP_PORT: "8788"
   DDP_PORT: "4048"
 
-  # ===== MSR2 Radar Screen (has to be up here because of how it is used in the page) =====
-  # MSR2_PREFIX: "apollo_msr_2_xxxxxx"
-
   # Note: some variables need to be configured at the page level down below
 
 esphome:
@@ -82,6 +79,8 @@ packages:
 
       # Visualize your Apollo Automation MSR-2
       # - path: packages/page-msr-2-radar.yaml
+      #   vars:
+      #     MSR2_PREFIX: "apollo_msr_2_xxxxxx"
 
       # DDP video streaming
       - path: packages/page-ddp-stream.yaml

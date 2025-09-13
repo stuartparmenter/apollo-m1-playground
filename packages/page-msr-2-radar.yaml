@@ -7,20 +7,8 @@
 # - Bottom zone LEDs reflect HA zone occupancy
 
 substitutions:
-  # vars.yaml provides:
+  # vars that need to be passed in to the package:
   # MSR2_PREFIX: apollo_msr_2_xxxxxx
-
-  # ---- HA entity_ids
-  MOVING_DISTANCE_ENTITY:   sensor.${MSR2_PREFIX}_radar_moving_distance
-  DETECTION_DISTANCE_ENTITY: sensor.${MSR2_PREFIX}_radar_detection_distance
-  MOVE_ENERGY_ENTITY:       sensor.${MSR2_PREFIX}_radar_move_energy
-  STILL_ENERGY_ENTITY:      sensor.${MSR2_PREFIX}_radar_still_energy
-  ZONE1_OCC_ENTITY:         binary_sensor.${MSR2_PREFIX}_radar_zone_1_occupancy
-  ZONE2_OCC_ENTITY:         binary_sensor.${MSR2_PREFIX}_radar_zone_2_occupancy
-  ZONE3_OCC_ENTITY:         binary_sensor.${MSR2_PREFIX}_radar_zone_3_occupancy
-  END_ZONE1_NUM_ENTITY:     number.${MSR2_PREFIX}_radar_end_zone_1
-  END_ZONE2_NUM_ENTITY:     number.${MSR2_PREFIX}_radar_end_zone_2
-  END_ZONE3_NUM_ENTITY:     number.${MSR2_PREFIX}_radar_end_zone_3
 
   # ---- Units (set to "1.0" if your distances are already in cm)
   DISTANCE_TO_CM: "2.54"   # inches → cm (set to "1.0" if already cm)
@@ -45,29 +33,29 @@ substitutions:
 text_sensor:
   - platform: homeassistant
     id: ts_mov
-    entity_id: ${MOVING_DISTANCE_ENTITY}
+    entity_id: sensor.${MSR2_PREFIX}_radar_moving_distance
     internal: true
 
 sensor:
   - platform: homeassistant
     id: s_det
-    entity_id: ${DETECTION_DISTANCE_ENTITY}
+    entity_id: sensor.${MSR2_PREFIX}_radar_detection_distance
     internal: true
 
   - platform: homeassistant
     id: s_move_e
-    entity_id: ${MOVE_ENERGY_ENTITY}
+    entity_id: sensor.${MSR2_PREFIX}_radar_move_energy
     internal: true
 
   - platform: homeassistant
     id: s_still_e
-    entity_id: ${STILL_ENERGY_ENTITY}
+    entity_id: sensor.${MSR2_PREFIX}_radar_still_energy
     internal: true
 
   # End-zone bounds (cm) from HA numbers → update globals
   - platform: homeassistant
     id: s_end1
-    entity_id: ${END_ZONE1_NUM_ENTITY}
+    entity_id: number.${MSR2_PREFIX}_radar_end_zone_1
     internal: true
     on_value:
       - lambda: |-
@@ -75,7 +63,7 @@ sensor:
 
   - platform: homeassistant
     id: s_end2
-    entity_id: ${END_ZONE2_NUM_ENTITY}
+    entity_id: number.${MSR2_PREFIX}_radar_end_zone_2
     internal: true
     on_value:
       - lambda: |-
@@ -83,7 +71,7 @@ sensor:
 
   - platform: homeassistant
     id: s_end3
-    entity_id: ${END_ZONE3_NUM_ENTITY}
+    entity_id: number.${MSR2_PREFIX}_radar_end_zone_3
     internal: true
     on_value:
       - lambda: |-
@@ -92,17 +80,17 @@ sensor:
 binary_sensor:
   - platform: homeassistant
     id: s_z1
-    entity_id: ${ZONE1_OCC_ENTITY}
+    entity_id: binary_sensor.${MSR2_PREFIX}_radar_zone_1_occupancy
     internal: true
 
   - platform: homeassistant
     id: s_z2
-    entity_id: ${ZONE2_OCC_ENTITY}
+    entity_id: binary_sensor.${MSR2_PREFIX}_radar_zone_2_occupancy
     internal: true
 
   - platform: homeassistant
     id: s_z3
-    entity_id: ${ZONE3_OCC_ENTITY}
+    entity_id: binary_sensor.${MSR2_PREFIX}_radar_zone_3_occupancy
     internal: true
 
 # ---------------- STATE ----------------
