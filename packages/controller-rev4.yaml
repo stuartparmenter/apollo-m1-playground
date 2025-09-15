@@ -11,6 +11,11 @@ esp32:
   cpu_frequency: 240MHz
   framework:
     type: esp-idf
+    advanced:
+      compiler_optimization: PERF
+      enable_idf_experimental_features: true
+    sdkconfig_options:
+      CONFIG_ESP32S3_DATA_CACHE_LINE_64B: y
 
 external_components:
   - source: github://stuartparmenter/ESPHome-HUB75-MatrixDisplayWrapper@use-official-library
