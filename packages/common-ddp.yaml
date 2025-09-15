@@ -15,6 +15,7 @@ ws_ddp_control:
   id: ws_ddp
   ws_host: ${WS_DDP_HOST}
   ws_port: ${WS_DDP_PORT}
+  device_id: ${name}
   ddp: ddp
 
 wifi:
