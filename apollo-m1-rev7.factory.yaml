@@ -27,6 +27,9 @@ api:
 wifi:
   power_save_mode: none
   ap:
+  on_connect:
+    - delay: 5s  # Gives time for improv results to be transmitted
+    - ble.disable:
 
 captive_portal:
 
