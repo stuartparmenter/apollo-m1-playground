@@ -18,7 +18,7 @@ ddp_stream:
   streams:
     - id: ${OUT_ID}
       canvas_id: "video_canvas"
-      back_buffers: 2  # 0-2
+      back_buffers: ${BACK_BUFFERS}  # 0-2
     # - id: 2
     #   canvas_id: "canvas32"
 

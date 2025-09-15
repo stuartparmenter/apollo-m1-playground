@@ -44,11 +44,11 @@ packages:
 
       # Shared DDP and DDP websocket control config
       # Note: This is required by "Now Playing" and the "DDP Stream" pages
-      # - path: packages/common-ddp.yaml
-      #   vars:
-      #     DDP_PORT: "4048"
-      #     WS_DDP_HOST: "homeassistant.local"
-      #     WS_DDP_PORT: "8788"
+      - path: packages/common-ddp.yaml
+        vars:
+          DDP_PORT: "4048"
+          WS_DDP_HOST: "homeassistant.local"
+          WS_DDP_PORT: "8788"
 
       # Basic Boot Screen to avoid flashing or things not being ready yet
       - path: packages/page-bios.yaml
@@ -88,6 +88,7 @@ packages:
       # DDP video streaming
       - path: packages/page-ddp-stream.yaml
         vars:
+          BACK_BUFFERS: 0  # 0-2
           DEFAULT_VIDEO_SRC: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
 
 # If you want to support non-horizontal layouts, you can uncomment this section below:
