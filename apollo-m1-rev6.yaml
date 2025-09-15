@@ -1,5 +1,5 @@
 substitutions:
-  name: "apollo-m1-r7"
+  name: "apollo-m1-r6"
   friendly_name: "Apollo M-1"
 
   # ===== Display / Panel =====
@@ -34,7 +34,7 @@ packages:
     refresh: 0s
     files:
       # Base board/pins, LVGL root, services, etc.
-      - path: packages/controller-rev7.yaml
+      - path: packages/controller-rev6.yaml
 
       # Shared helpers, sensors, buttons
       - path: packages/common-utils.yaml

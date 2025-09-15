@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suffix: [rev4, rev7]
+        suffix: [rev4, rev6]
     uses: esphome/workflows/.github/workflows/build.yml@2025.8.1
     with:
       #### Modify below here to match your project ####

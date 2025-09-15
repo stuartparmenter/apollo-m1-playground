@@ -23,7 +23,7 @@ jobs:
         #### Modify below here to match your project ####
         file:
           - apollo-m1-rev4
-          - apollo-m1-rev7
+          - apollo-m1-rev6
         #### Modify above here to match your project ####
 
         esphome-version:

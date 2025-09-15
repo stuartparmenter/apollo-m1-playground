@@ -4,7 +4,7 @@ external_components:
     refresh: 1h
 
 substitutions:
-  name: "apollo-m1-r7"
+  name: "apollo-m1-r6"
   friendly_name: "Apollo M-1"
 
   # ===== Display / Panel =====
@@ -37,7 +37,7 @@ captive_portal:
 # In this case it is the core yaml file that does not contain the extra things
 # that are provided by this factory yaml file as the user does not need these once adopted.
 dashboard_import:
-  package_import_url: github://stuartparmenter/apollo-m1-playground/apollo-m1-rev7.yaml@main
+  package_import_url: github://stuartparmenter/apollo-m1-playground/apollo-m1-rev6.yaml@main
   import_full_config: true
 
 # Sets up Bluetooth LE (Only on ESP32) to allow the user
@@ -59,11 +59,11 @@ ota:
 update:
   - platform: http_request
     name: Firmware
-    source: https://github.com/stuartparmenter/apollo-m1-playground/releases/latest/download/apollo-m1-rev7.manifest.json
+    source: https://github.com/stuartparmenter/apollo-m1-playground/releases/latest/download/apollo-m1-rev6.manifest.json
 
 packages:
   # Base board/pins, LVGL root, services, etc.
-  - !include packages/controller-rev7.yaml
+  - !include packages/controller-rev6.yaml
 
   # Shared helpers, sensors, buttons
   - !include packages/common-utils.yaml

@@ -12,7 +12,7 @@ You can use the button below to install the pre-built firmware directly to your 
     <label><input type="radio" name="type" value="rev4" checked/> Rev 4</label>
 </li>
 <li>
-    <label><input type="radio" name="type" value="rev7" /> Rev 7</label>
+    <label><input type="radio" name="type" value="rev6" /> Rev 6</label>
 </li>
 </ul>
 
