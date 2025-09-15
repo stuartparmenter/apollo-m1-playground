@@ -8,22 +8,13 @@
 
 substitutions:
   # vars.yaml provides:
-  # WS_DDP_HOST: "192.168.1.200"
-  # WS_DDP_PORT: "8788"
-  # DDP_PORT: "4048"
   # DEFAULT_VIDEO_SRC: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"   # or "mario.gif" or https://... / file:///sd/... etc.
   CANVAS_WIDTH: ${DISPLAY_W}
   CANVAS_HEIGHT: ${DISPLAY_H}
   OUT_ID: "1"
 
-external_components:
-  - source: github://stuartparmenter/lvgl-ddp-stream@v0.3.0
-    components: [ddp_stream, ws_ddp_control]
-
 # UDP DDP sink + canvas bindings (no w/h required here)
 ddp_stream:
-  id: ddp
-  port: ${DDP_PORT}
   streams:
     - id: ${OUT_ID}
       canvas_id: "video_canvas"
@@ -35,10 +26,6 @@ ddp_stream:
 # WebSocket control
 # -----------------------------
 ws_ddp_control:
-  id: ws
-  ws_host: ${WS_DDP_HOST}
-  ws_port: ${WS_DDP_PORT}
-  ddp: ddp
   outputs:
     - id: ${OUT_ID}
       src: ${DEFAULT_VIDEO_SRC}
@@ -68,13 +55,11 @@ lvgl:
       on_load:
         then:
           - lambda: |-
-              id(ws).connect();
-              id(ws).start(${OUT_ID});
+              id(ws_ddp).start(${OUT_ID});
       on_unload:
         then:
           - lambda: |-
-              id(ws).stop(${OUT_ID});
-              id(ws).disconnect();
+              id(ws_ddp).stop(${OUT_ID});
 
 # -----------------------------
 # Runtime source change
@@ -89,4 +74,4 @@ text:
     on_value:
       then:
         - lambda: |-
-            id(ws).set_src(${OUT_ID}, x.c_str());
+            id(ws_ddp).set_src(${OUT_ID}, x.c_str());

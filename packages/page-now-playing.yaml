@@ -77,12 +77,8 @@ script:
           std::string full = normalize_ha_image_url(path_or_url, base);
           if (id(last_art_url) == full) return;
           id(art_src_ctl) = full;
-          id(ws).set_src(${NP_OUT_ID}, id(art_src_ctl).c_str());
+          id(ws_ddp).set_src(${NP_OUT_ID}, id(art_src_ctl).c_str());
           id(last_art_url) = id(art_src_ctl);
-
-external_components:
-  - source: github://stuartparmenter/lvgl-ddp-stream@v0.3.0
-    components: [ddp_stream, ws_ddp_control]
 
 globals:
   - id: last_art_url
@@ -102,8 +98,6 @@ globals:
 
 # DDP sink + canvas binding
 ddp_stream:
-  id: ddp
-  port: ${DDP_PORT}
   streams:
     - id: ${NP_OUT_ID}
       canvas_id: "art_canvas"
@@ -111,10 +105,6 @@ ddp_stream:
 
 # WebSocket control for artwork streaming
 ws_ddp_control:
-  id: ws
-  ws_host: ${WS_DDP_HOST}
-  ws_port: ${WS_DDP_PORT}
-  ddp: ddp
   outputs:
     - id: ${NP_OUT_ID}
       src: ${DEFAULT_ART_SRC}
@@ -197,7 +187,7 @@ sensor:
           then:
             - lambda: |-
                 id(art_src_ctl) = id(ha_entity_picture).state;
-                id(ws).set_src(${NP_OUT_ID}, id(art_src_ctl).c_str());
+                id(ws_ddp).set_src(${NP_OUT_ID}, id(art_src_ctl).c_str());
                 id(last_art_url) = id(art_src_ctl);
 
   - platform: homeassistant
@@ -425,8 +415,7 @@ lvgl:
       on_load:
         then:
           - lambda: |-
-              id(ws).connect();
-              id(ws).start(${NP_OUT_ID});
+              id(ws_ddp).start(${NP_OUT_ID});
           - if:
               condition:
                 lambda: 'return id(ha_media_title).has_state();'
@@ -447,7 +436,7 @@ lvgl:
               then:
                 - lambda: |-
                     id(art_src_ctl) = id(ha_entity_picture).state;
-                    id(ws).set_src(${NP_OUT_ID}, id(art_src_ctl).c_str());
+                    id(ws_ddp).set_src(${NP_OUT_ID}, id(art_src_ctl).c_str());
                     id(last_art_url) = id(art_src_ctl);
           - lambda: |-
               lv_obj_set_style_anim_speed(id(title_lbl), 7, LV_PART_MAIN);
