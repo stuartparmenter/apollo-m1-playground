@@ -34,6 +34,11 @@ button:
     on_press:
       - script.execute: lvgl_prev_page
 
+  - platform: restart
+    icon: mdi:power-cycle
+    name: "ESP Reboot"
+    entity_category: "diagnostic"
+
 # Memory reporting sensor
 sensor:
   - platform: template
@@ -47,6 +52,7 @@ sensor:
       #include "esp_heap_caps.h"
       // Bytes of free internal heap
       return (float) heap_caps_get_free_size(MALLOC_CAP_8BIT | MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+    disabled_by_default: true
 
   - platform: template
     name: "Free Heap (PSRAM)"
@@ -59,3 +65,32 @@ sensor:
       #include "esp_heap_caps.h"
       // KBytes of free psram heap
       return (float) heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024;
+    disabled_by_default: true
+
+  - platform: internal_temperature
+    name: "ESP Temperature"
+    id: sys_esp_temperature
+    entity_category: "diagnostic"
+    disabled_by_default: true
+
+  - platform: uptime
+    name: Uptime
+    id: sys_uptime
+    update_interval: 60s
+    entity_category: "diagnostic"
+    disabled_by_default: true
+
+  - platform: wifi_signal
+    name: RSSI
+    id: wifi_signal_db
+    update_interval: 60s
+    entity_category: "diagnostic"
+    disabled_by_default: true
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "IP"
+      icon: "mdi:ip-outline"
+      entity_category: "diagnostic"
+      disabled_by_default: true
