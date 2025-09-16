@@ -34,25 +34,124 @@ script:
           };
           auto normalize_media_text = [&](std::string s) -> std::string {
             if (!simplify_unicode) return s;
-            rep_all(s, "\xE2\x80\x99", "'");
-            rep_all(s, "\xE2\x80\x98", "'");
-            rep_all(s, "\xCA\xBC",     "'");
-            rep_all(s, "\xE2\x80\x9C", "\"");
-            rep_all(s, "\xE2\x80\x9D", "\"");
-            rep_all(s, "\xE2\x80\x93", "-");
-            rep_all(s, "\xE2\x80\x94", "-");
-            rep_all(s, "\xE2\x80\xA6", "...");
-            rep_all(s, "\xC2\xA0", " ");
-            rep_all(s, "\xE2\x84\xA2", "");
-            rep_all(s, "\xC2\xAE",    "");
-            rep_all(s, "\xC3\xA9","e"); rep_all(s, "\xC3\xA8","e"); rep_all(s, "\xC3\xAA","e"); rep_all(s, "\xC3\xAB","e");
-            rep_all(s, "\xC3\xA1","a"); rep_all(s, "\xC3\xA0","a"); rep_all(s, "\xC3\xA4","a"); rep_all(s, "\xC3\xA2","a");
-            rep_all(s, "\xC3\xAD","i"); rep_all(s, "\xC3\xAC","i"); rep_all(s, "\xC3\xAF","i"); rep_all(s, "\xC3\xAE","i");
-            rep_all(s, "\xC3\xB3","o"); rep_all(s, "\xC3\xB2","o"); rep_all(s, "\xC3\xB6","o"); rep_all(s, "\xC3\xB4","o"); rep_all(s, "\xC3\xB8","o");
-            rep_all(s, "\xC3\xBA","u"); rep_all(s, "\xC3\xB9","u"); rep_all(s, "\xC3\xBC","u"); rep_all(s, "\xC3\xBB","u");
-            rep_all(s, "\xC3\xB1","n");
-            rep_all(s, "\xC3\xA7","c");
-            rep_all(s, "\xC3\x9F","ss");
+            if (std::all_of(s.begin(), s.end(), [](unsigned char ch){ return ch < 0x80; })) return s;
+            // --- Hyphens / Dashes ---
+            // Normalize everything to ASCII hyphen-minus (U+002D)
+            rep_all(s, "\x2D", "-");          // U+002D HYPHEN-MINUS
+            rep_all(s, "\xE2\x80\x90", "-");  // U+2010 HYPHEN
+            rep_all(s, "\xE2\x80\x91", "-");  // U+2011 NON-BREAKING HYPHEN
+            rep_all(s, "\xE2\x80\x92", "-");  // U+2012 FIGURE DASH
+            rep_all(s, "\xE2\x80\x93", "-");  // U+2013 EN DASH
+            rep_all(s, "\xE2\x80\x94", "-");  // U+2014 EM DASH
+            rep_all(s, "\xE2\x80\x95", "-");  // U+2015 HORIZONTAL BAR
+            rep_all(s, "\xE2\x88\x92", "-");  // U+2212 MINUS SIGN
+            rep_all(s, "\xEF\xBC\x8D", "-");  // U+FF0D FULLWIDTH HYPHEN-MINUS
+            rep_all(s, "\xC2\xAD", "");       // U+00AD SOFT HYPHEN (delete)
+            rep_all(s, "\xE2\x81\x83", "");   // U+2053 SWUNG DASH (delete)
+
+            // --- Quotes / Apostrophes ---
+            // Collapse curly/special quotes into ASCII ' and "
+            rep_all(s, "\xE2\x80\x98", "'");  // U+2018 LEFT SINGLE QUOTATION MARK
+            rep_all(s, "\xE2\x80\x99", "'");  // U+2019 RIGHT SINGLE QUOTATION MARK
+            rep_all(s, "\xE2\x80\x9A", "'");  // U+201A SINGLE LOW-9 QUOTATION MARK
+            rep_all(s, "\xE2\x80\xB2", "'");  // U+2032 PRIME (often used as apostrophe)
+            rep_all(s, "\xE2\x80\x9C", "\""); // U+201C LEFT DOUBLE QUOTATION MARK
+            rep_all(s, "\xE2\x80\x9D", "\""); // U+201D RIGHT DOUBLE QUOTATION MARK
+            rep_all(s, "\xE2\x80\x9E", "\""); // U+201E DOUBLE LOW-9 QUOTATION MARK
+
+            // --- Ellipsis ---
+            rep_all(s, "\xE2\x80\xA6", "..."); // U+2026 HORIZONTAL ELLIPSIS
+
+            // --- Spaces ---
+            // Normalize special spaces to ASCII space
+            rep_all(s, "\xC2\xA0", " ");      // U+00A0 NO-BREAK SPACE
+            rep_all(s, "\xE2\x80\xAF", " ");  // U+202F NARROW NO-BREAK SPACE
+            rep_all(s, "\xE2\x81\x9F", " ");  // U+205F MEDIUM MATHEMATICAL SPACE
+            rep_all(s, "\xE3\x80\x80", " ");  // U+3000 IDEOGRAPHIC SPACE
+
+            // --- Latin-1 Supplement letters (U+00C0–U+00FF) ---
+            // A
+            rep_all(s, "\xC3\x80", "A"); // U+00C0 À
+            rep_all(s, "\xC3\x81", "A"); // U+00C1 Á
+            rep_all(s, "\xC3\x82", "A"); // U+00C2 Â
+            rep_all(s, "\xC3\x83", "A"); // U+00C3 Ã
+            rep_all(s, "\xC3\x84", "A"); // U+00C4 Ä
+            rep_all(s, "\xC3\x85", "A"); // U+00C5 Å
+            rep_all(s, "\xC3\xA0", "a"); // U+00E0 à
+            rep_all(s, "\xC3\xA1", "a"); // U+00E1 á
+            rep_all(s, "\xC3\xA2", "a"); // U+00E2 â
+            rep_all(s, "\xC3\xA3", "a"); // U+00E3 ã
+            rep_all(s, "\xC3\xA4", "a"); // U+00E4 ä
+            rep_all(s, "\xC3\xA5", "a"); // U+00E5 å
+
+            // AE ligature
+            rep_all(s, "\xC3\x86", "AE"); // U+00C6 Æ
+            rep_all(s, "\xC3\xA6", "ae"); // U+00E6 æ
+
+            // C
+            rep_all(s, "\xC3\x87", "C"); // U+00C7 Ç
+            rep_all(s, "\xC3\xA7", "c"); // U+00E7 ç
+
+            // E
+            rep_all(s, "\xC3\x88", "E"); // U+00C8 È
+            rep_all(s, "\xC3\x89", "E"); // U+00C9 É
+            rep_all(s, "\xC3\x8A", "E"); // U+00CA Ê
+            rep_all(s, "\xC3\x8B", "E"); // U+00CB Ë
+            rep_all(s, "\xC3\xA8", "e"); // U+00E8 è
+            rep_all(s, "\xC3\xA9", "e"); // U+00E9 é
+            rep_all(s, "\xC3\xAA", "e"); // U+00EA ê
+            rep_all(s, "\xC3\xAB", "e"); // U+00EB ë
+
+            // I
+            rep_all(s, "\xC3\x8C", "I"); // U+00CC Ì
+            rep_all(s, "\xC3\x8D", "I"); // U+00CD Í
+            rep_all(s, "\xC3\x8E", "I"); // U+00CE Î
+            rep_all(s, "\xC3\x8F", "I"); // U+00CF Ï
+            rep_all(s, "\xC3\xAC", "i"); // U+00EC ì
+            rep_all(s, "\xC3\xAD", "i"); // U+00ED í
+            rep_all(s, "\xC3\xAE", "i"); // U+00EE î
+            rep_all(s, "\xC3\xAF", "i"); // U+00EF ï
+
+            // N
+            rep_all(s, "\xC3\x91", "N"); // U+00D1 Ñ
+            rep_all(s, "\xC3\xB1", "n"); // U+00F1 ñ
+
+            // O
+            rep_all(s, "\xC3\x92", "O"); // U+00D2 Ò
+            rep_all(s, "\xC3\x93", "O"); // U+00D3 Ó
+            rep_all(s, "\xC3\x94", "O"); // U+00D4 Ô
+            rep_all(s, "\xC3\x95", "O"); // U+00D5 Õ
+            rep_all(s, "\xC3\x96", "O"); // U+00D6 Ö
+            rep_all(s, "\xC3\x98", "O"); // U+00D8 Ø
+            rep_all(s, "\xC3\xB2", "o"); // U+00F2 ò
+            rep_all(s, "\xC3\xB3", "o"); // U+00F3 ó
+            rep_all(s, "\xC3\xB4", "o"); // U+00F4 ô
+            rep_all(s, "\xC3\xB5", "o"); // U+00F5 õ
+            rep_all(s, "\xC3\xB6", "o"); // U+00F6 ö
+            rep_all(s, "\xC3\xB8", "o"); // U+00F8 ø
+
+            // U
+            rep_all(s, "\xC3\x99", "U"); // U+00D9 Ù
+            rep_all(s, "\xC3\x9A", "U"); // U+00DA Ú
+            rep_all(s, "\xC3\x9B", "U"); // U+00DB Û
+            rep_all(s, "\xC3\x9C", "U"); // U+00DC Ü
+            rep_all(s, "\xC3\xB9", "u"); // U+00F9 ù
+            rep_all(s, "\xC3\xBA", "u"); // U+00FA ú
+            rep_all(s, "\xC3\xBB", "u"); // U+00FB û
+            rep_all(s, "\xC3\xBC", "u"); // U+00FC ü
+
+            // Y
+            rep_all(s, "\xC3\x9D", "Y"); // U+00DD Ý
+            rep_all(s, "\xC3\xBD", "y"); // U+00FD ý
+            rep_all(s, "\xC3\xBF", "y"); // U+00FF ÿ
+
+            // ß
+            rep_all(s, "\xC3\x9F", "ss"); // U+00DF ß
+
+            // --- Ligatures (Latin Extended but common) ---
+            rep_all(s, "\xC5\x92", "OE"); // U+0152 Œ
+            rep_all(s, "\xC5\x93", "oe"); // U+0153 œ
+
             return s;
           };
           std::string out = normalize_media_text(text);
