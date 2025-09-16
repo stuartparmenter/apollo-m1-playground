@@ -71,6 +71,7 @@ text:
     optimistic: true
     initial_value: ${DEFAULT_VIDEO_SRC}
     mode: text
+    restore_value: true
     on_value:
       then:
         - lambda: |-
