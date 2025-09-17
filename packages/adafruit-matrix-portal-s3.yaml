@@ -1,0 +1,312 @@
+# © Copyright 2025 Stuart Parmenter
+# SPDX-License-Identifier: MIT
+
+substitutions:
+  PANEL_W: "64"
+  PANEL_H: "64"
+
+esp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 8MB
+  cpu_frequency: 240MHz
+  framework:
+    type: esp-idf
+    advanced:
+      compiler_optimization: PERF
+      execute_from_psram: false  # Disable w/ quad psram
+      enable_idf_experimental_features: true
+    sdkconfig_options:
+      CONFIG_ESP32S3_DATA_CACHE_LINE_64B: y
+
+psram:
+  mode: quad
+  speed: 80MHz
+
+external_components:
+  - source: github://stuartparmenter/ESPHome-HUB75-MatrixDisplayWrapper@use-official-library
+
+display:
+  - platform: hub75_matrix_display
+    id: matrix
+    width: ${PANEL_W}
+    height: ${PANEL_H}
+    chain_length: ${DISPLAY_CHAIN_LEN}
+    clock_phase: false # fixes off by 1 issue
+    latch_blanking: 1
+    i2sspeed: HZ_20M
+
+    # Adafruit MatrixPortal S3 HUB75 pin mappings
+    R1_pin: GPIO42
+    G1_pin: GPIO41
+    B1_pin: GPIO40
+    R2_pin: GPIO38
+    G2_pin: GPIO39
+    B2_pin: GPIO37
+    A_pin:  GPIO45
+    B_pin:  GPIO36
+    C_pin:  GPIO48
+    D_pin:  GPIO35
+    E_pin:  GPIO21
+    LAT_pin: GPIO47
+    OE_pin:  GPIO14
+    CLK_pin: GPIO2
+
+    # for LVGL
+    double_buffer: false
+    auto_clear_enabled: false
+    update_interval: never
+
+# I²C bus for onboard LIS3DH accelerometer (STEMMA QT connector shares it)
+i2c:
+  - id: i2c0
+    sda: GPIO16
+    scl: GPIO17
+    frequency: 100kHz
+    scan: true
+
+# Using raw I²C operations for LIS3DH communication at address 0x19
+# Alternative: i2c_device approach (commented out for testing)
+i2c_device:
+  - id: lis3dh_device
+    address: 0x19
+    i2c_id: i2c0
+
+# Globals for calibration offsets and initialization flag
+globals:
+  - id: acc_x_offset
+    type: float
+    initial_value: '0.0'
+  - id: acc_y_offset
+    type: float
+    initial_value: '0.0'
+  - id: acc_z_offset
+    type: float
+    initial_value: '0.0'
+  - id: lis3dh_boot_complete
+    type: bool
+    initial_value: 'false'
+
+sensor:
+  - platform: template
+    id: acc_x_raw
+    internal: true
+    filters:
+      - delta: 0.02
+
+  - platform: template
+    id: acc_y_raw
+    internal: true
+    filters:
+      - delta: 0.02
+
+  - platform: template
+    id: acc_z_raw
+    internal: true
+    filters:
+      - delta: 0.02
+
+  - platform: template
+    id: acc_x
+    name: "LIS3DH X"
+    unit_of_measurement: "g"
+    accuracy_decimals: 3
+    lambda: |-
+      return id(acc_x_raw).state - id(acc_x_offset);
+    filters:
+      - sliding_window_moving_average:
+          window_size: 5
+          send_every: 1
+      - delta: 0.01
+
+  - platform: template
+    id: acc_y
+    name: "LIS3DH Y"
+    unit_of_measurement: "g"
+    accuracy_decimals: 3
+    lambda: |-
+      return id(acc_y_raw).state - id(acc_y_offset);
+    filters:
+      - sliding_window_moving_average:
+          window_size: 5
+          send_every: 1
+      - delta: 0.01
+
+  - platform: template
+    id: acc_z
+    name: "LIS3DH Z"
+    unit_of_measurement: "g"
+    accuracy_decimals: 3
+    lambda: |-
+      return id(acc_z_raw).state - id(acc_z_offset);
+    filters:
+      - sliding_window_moving_average:
+          window_size: 5
+          send_every: 1
+      - delta: 0.01
+
+esphome:
+  on_boot:
+    priority: -100  # Low priority - run after everything else is initialized
+    then:
+      - delay: 2s  # Give I2C bus time to fully stabilize
+      - lambda: |-
+          ESP_LOGI("lis3dh", "Boot complete after delay, enabling LIS3DH initialization");
+          id(lis3dh_boot_complete) = true;
+
+interval:
+  - interval: 20ms
+    then:
+      - lambda: |-
+          // One-time init guard - wait for boot complete flag
+          static bool inited = false;
+
+          // Don't attempt initialization until boot is complete
+          if (!id(lis3dh_boot_complete)) {
+            return;
+          }
+
+          if (!inited) {
+            ESP_LOGI("lis3dh", "Attempting to initialize LIS3DH with i2c_device...");
+
+            // Read WHO_AM_I register via i2c_device (repeated START)
+            uint8_t who = 0;
+            {
+              auto err = id(lis3dh_device).read_register(0x0F, &who, 1);
+              if (err != i2c::ERROR_OK) {
+                ESP_LOGE("lis3dh", "WHO_AM_I read failed (err=%d)", (int)err);
+                return;
+              }
+            }
+
+            ESP_LOGI("lis3dh", "WHO_AM_I: 0x%02X (expected 0x33)", who);
+            if (who != 0x33) {
+              ESP_LOGE("lis3dh", "LIS3DH not found! WHO_AM_I should be 0x33, got 0x%02X", who);
+              return;
+            }
+
+            // Configure LIS3DH using i2c_device
+            // CTRL_REG1 (0x20): ODR=100Hz, X/Y/Z enable
+            {
+              uint8_t ctrl1 = 0x57;
+              auto err = id(lis3dh_device).write_register(0x20, &ctrl1, 1);
+              if (err != i2c::ERROR_OK) {
+                ESP_LOGE("lis3dh", "CTRL_REG1 write failed (err=%d)", (int)err);
+                return;
+              }
+            }
+
+            // CTRL_REG4 (0x23): BDU=1, HR=1, FS=±2g
+            {
+              uint8_t ctrl4 = 0x88;
+              auto err = id(lis3dh_device).write_register(0x23, &ctrl4, 1);
+              if (err != i2c::ERROR_OK) {
+                ESP_LOGE("lis3dh", "CTRL_REG4 write failed (err=%d)", (int)err);
+                return;
+              }
+            }
+
+            ESP_LOGI("lis3dh", "LIS3DH initialized successfully (i2c_device)");
+            inited = true;
+          }
+
+          if (!inited) return;
+
+          // Read 6 bytes starting at OUT_X_L (0x28) with auto-increment (MSB=1)
+          uint8_t raw[6] = {0};
+          {
+            uint8_t data_reg = 0x28 | 0x80;  // auto-increment bit
+            auto err = id(lis3dh_device).write_read(&data_reg, 1, raw, 6);
+            if (err != i2c::ERROR_OK) {
+              ESP_LOGW("lis3dh", "Acceleration burst read failed (err=%d)", (int)err);
+              return;
+            }
+          }
+
+          // Little-endian: L then H. In High-Res, data is 12-bit left-justified in 16-bit.
+          auto conv = [&](uint8_t lo, uint8_t hi) -> float {
+            int16_t raw_val = (int16_t)(((uint16_t)hi << 8) | lo);
+            raw_val >>= 4;                 // 12-bit left-justified
+            return raw_val * 2.0f / 2048.0f;  // ±2g range, 12-bit scale
+          };
+
+          float x = conv(raw[0], raw[1]);
+          float y = conv(raw[2], raw[3]);
+          float z = conv(raw[4], raw[5]);
+
+          id(acc_x_raw).publish_state(x);
+          id(acc_y_raw).publish_state(y);
+          id(acc_z_raw).publish_state(z);
+
+# Calibration button - zeroes the accelerometer
+button:
+  - platform: template
+    name: "Calibrate LIS3DH"
+    id: calibrate_lis3dh
+    on_press:
+      - lambda: |-
+          // Set current raw values as the zero point
+          id(acc_x_offset) = id(acc_x_raw).state;
+          id(acc_y_offset) = id(acc_y_raw).state;
+          id(acc_z_offset) = id(acc_z_raw).state;
+          ESP_LOGI("lis3dh", "Calibrated: X=%.3f, Y=%.3f, Z=%.3f",
+                   id(acc_x_offset), id(acc_y_offset), id(acc_z_offset));
+
+  - platform: template
+    name: "Reset LIS3DH Calibration"
+    id: reset_lis3dh_cal
+    on_press:
+      - lambda: |-
+          id(acc_x_offset) = 0.0;
+          id(acc_y_offset) = 0.0;
+          id(acc_z_offset) = 0.0;
+          ESP_LOGI("lis3dh", "Reset calibration to zero");
+
+binary_sensor:
+  - platform: gpio
+    id: btn_up
+    name: "Button Up"
+    pin:
+      number: GPIO6
+      mode:
+        input: true
+        pullup: true
+    filters:
+      - invert:
+
+  - platform: gpio
+    id: btn_down
+    name: "Button Down"
+    pin:
+      number: GPIO7
+      mode:
+        input: true
+        pullup: true
+    filters:
+      - invert:
+
+# Status NeoPixel LED
+light:
+  - platform: esp32_rmt_led_strip
+    rgb_order: GRB
+    pin: GPIO4
+    num_leds: 1
+    chipset: WS2812
+    name: "Status LED"
+    id: status_led
+
+switch:
+  - platform: hub75_matrix_display
+    matrix_id: matrix
+    name: "Power"
+    restore_mode: ALWAYS_ON
+    id: power
+
+number:
+  - platform: hub75_matrix_display
+    matrix_id: matrix
+    name: "Brightness"
+
+lvgl:
+  buffer_size: 100%
+  displays:
+    - matrix
