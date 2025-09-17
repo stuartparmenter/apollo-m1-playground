@@ -1,28 +1,31 @@
 # About
 
-ESPHome based firmware for the Apollo Automation M‑1 HUB75 controller.  Contains some basic screens and lets you adopt it in ESPHome Builder in Home Assistant for additional pages, customization, etc.
+ESPHome based firmware for HUB75 LED matrix controllers. Contains interactive pages and effects using LVGL, and allows adoption in ESPHome Builder in Home Assistant for additional customization.
 
 # Installation
 
 You can use the button below to install the pre-built firmware directly to your device via USB from the browser.
 
-<p>Select your controller revision:</p>
+<p>Select your controller:</p>
 <ul class="radios">
 <li>
-    <label><input type="radio" name="type" value="rev4" checked/> Rev 4</label>
+    <label><input type="radio" name="type" value="apollo-automation-m1-rev4" data-manifest="apollo-automation-m1-rev4.manifest.json" checked/> Apollo Automation M-1 Rev4</label>
 </li>
 <li>
-    <label><input type="radio" name="type" value="rev6" /> Rev 6</label>
+    <label><input type="radio" name="type" value="apollo-automation-m1-rev6" data-manifest="apollo-automation-m1-rev6.manifest.json" /> Apollo Automation M-1 Rev6</label>
+</li>
+<li>
+    <label><input type="radio" name="type" value="adafruit-matrix-portal-s3" data-manifest="adafruit-matrix-portal-s3.manifest.json" /> Adafruit Matrix Portal S3</label>
 </li>
 </ul>
 
-<esp-web-install-button manifest="firmware/apollo-m1-rev4.manifest.json"></esp-web-install-button>
+<esp-web-install-button manifest="firmware/apollo-automation-m1-rev4.manifest.json"></esp-web-install-button>
 
 <script>
     document.querySelectorAll('input[name="type"]').forEach(radio =>
     radio.addEventListener("change", () => {
         const button = document.querySelector('esp-web-install-button');
-        button.manifest = `firmware/apollo-m1-${radio.value}.manifest.json`;
+        button.manifest = `firmware/${radio.dataset.manifest}`;
     }
     ));
 </script>
