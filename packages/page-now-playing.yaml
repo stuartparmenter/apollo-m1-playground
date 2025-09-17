@@ -519,16 +519,29 @@ lvgl:
               condition:
                 lambda: 'return id(ha_media_title).has_state();'
               then:
-                - lvgl.label.update:
-                    id: title_lbl
+                - script.execute:
+                    id: np_set_label_text_normalized
+                    widget: !lambda 'return id(title_lbl);'
                     text: !lambda 'return id(ha_media_title).state;'
+                    simplify_unicode: true
           - if:
               condition:
                 lambda: 'return id(ha_media_artist).has_state();'
               then:
-                - lvgl.label.update:
-                    id: artist_lbl
+                - script.execute:
+                    id: np_set_label_text_normalized
+                    widget: !lambda 'return id(artist_lbl);'
                     text: !lambda 'return id(ha_media_artist).state;'
+                    simplify_unicode: true
+          - if:
+              condition:
+                lambda: 'return id(ha_media_album).has_state();'
+              then:
+                - script.execute:
+                    id: np_set_label_text_normalized
+                    widget: !lambda 'return id(album_lbl);'
+                    text: !lambda 'return id(ha_media_album).state;'
+                    simplify_unicode: true
           - if:
               condition:
                 lambda: 'return id(ha_entity_picture).has_state();'
