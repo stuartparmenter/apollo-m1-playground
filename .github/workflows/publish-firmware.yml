@@ -13,13 +13,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suffix: [rev4, rev6]
+        file: [apollo-automation-m1-rev4, apollo-automation-m1-rev6, adafruit-matrix-portal-s3]
     uses: esphome/workflows/.github/workflows/build.yml@2025.8.1
     with:
       #### Modify below here to match your project ####
-      files: apollo-m1-${{ matrix.suffix }}.factory.yaml
+      files: ${{ matrix.file }}.factory.yaml
       esphome-version: 2025.8.0
-      combined-name: apollo-m1-${{ matrix.suffix }}
+      combined-name: ${{ matrix.file }}
       #### Modify above here to match your project ####
 
       release-summary: ${{ github.event.release.body }}

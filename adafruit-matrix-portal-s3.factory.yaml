@@ -1,0 +1,79 @@
+substitutions:
+  name: "matrix-portal-s3"
+  friendly_name: "Matrix Portal S3"
+
+  # ===== Display / Panel =====
+  DISPLAY_CHAIN_LEN: "1" # Total number of panels you have connected
+  DISPLAY_W: "64"  # Most likely 64 * ${DISPLAY_CHAIN_LEN}
+  DISPLAY_H: "64"  # Most likely 64
+
+esphome:
+  name: "${name}"
+  friendly_name: "${friendly_name}"
+  name_add_mac_suffix: true
+  project:
+    name: stuartparmenter.apollo-m1-playground
+    version: dev # This will be replaced by the github workflows with the `release` version
+
+logger:
+
+api:
+
+wifi:
+  power_save_mode: none
+  ap:
+  on_connect:
+    - delay: 5s  # Gives time for improv results to be transmitted
+    - ble.disable:
+
+captive_portal:
+
+# This should point to the public location of the yaml file that will be adopted.
+# In this case it is the core yaml file that does not contain the extra things
+# that are provided by this factory yaml file as the user does not need these once adopted.
+dashboard_import:
+  package_import_url: github://stuartparmenter/apollo-m1-playground/adafruit-matrix-portal-s3.yaml@main
+  import_full_config: true
+
+# Sets up Bluetooth LE (Only on ESP32) to allow the user
+# to provision wifi credentials to the device.
+esp32_improv:
+  authorizer: none
+
+# Sets up the improv via serial client for Wi-Fi provisioning.
+# Handy if your device has a usb port for the user to add credentials when they first get it.
+improv_serial:
+
+# Used to pull OTA updates
+http_request:
+
+ota:
+  - platform: http_request
+  - platform: esphome
+
+update:
+  - platform: http_request
+    name: Firmware
+    source: https://github.com/stuartparmenter/apollo-m1-playground/releases/latest/download/adafruit-matrix-portal-s3.manifest.json
+
+packages:
+  # Base board/pins, LVGL root, services, etc.
+  - !include packages/controllers/adafruit-matrix-portal-s3.yaml
+
+  # Shared helpers, sensors, buttons
+  - !include packages/common/utils.yaml
+
+  # Shared fonts and LVGL styles
+  - !include packages/common/theme.yaml
+
+  # Basic Boot Screen to avoid flashing or things not being ready yet
+  - !include packages/pages/bios.yaml
+
+  # Simple clock page
+  - !include packages/pages/clock.yaml
+
+  # Page that uses lvgl-canvas-fx to render various effects (and change which in HA)
+  - !include packages/pages/fx.yaml
+
+  # A classic
+  - !include packages/pages/pong.yaml

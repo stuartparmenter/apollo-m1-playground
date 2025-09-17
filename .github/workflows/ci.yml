@@ -22,8 +22,9 @@ jobs:
       matrix:
         #### Modify below here to match your project ####
         file:
-          - apollo-m1-rev4
-          - apollo-m1-rev6
+          - apollo-automation-m1-rev4
+          - apollo-automation-m1-rev6
+          - adafruit-matrix-portal-s3
         #### Modify above here to match your project ####
 
         esphome-version:

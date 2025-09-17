@@ -4,7 +4,7 @@ external_components:
     refresh: 1h
 
 substitutions:
-  name: "apollo-m1-r6"
+  name: "apollo-m1-r4"
   friendly_name: "Apollo M-1"
 
   # ===== Display / Panel =====
@@ -37,7 +37,7 @@ captive_portal:
 # In this case it is the core yaml file that does not contain the extra things
 # that are provided by this factory yaml file as the user does not need these once adopted.
 dashboard_import:
-  package_import_url: github://stuartparmenter/apollo-m1-playground/apollo-m1-rev6.yaml@main
+  package_import_url: github://stuartparmenter/apollo-m1-playground/apollo-automation-m1-rev4.yaml@main
   import_full_config: true
 
 # Sets up Bluetooth LE (Only on ESP32) to allow the user
@@ -59,29 +59,23 @@ ota:
 update:
   - platform: http_request
     name: Firmware
-    source: https://github.com/stuartparmenter/apollo-m1-playground/releases/latest/download/apollo-m1-rev6.manifest.json
+    source: https://github.com/stuartparmenter/apollo-m1-playground/releases/latest/download/apollo-automation-m1-rev4.manifest.json
 
 packages:
   # Base board/pins, LVGL root, services, etc.
-  - !include packages/controller-rev6.yaml
+  - !include packages/controllers/apollo-automation-m1-rev4.yaml
 
   # Shared helpers, sensors, buttons
-  - !include packages/common-utils.yaml
+  - !include packages/common/utils.yaml
 
   # Shared fonts and LVGL styles
-  - !include packages/common-theme.yaml
+  - !include packages/common/theme.yaml
 
   # Basic Boot Screen to avoid flashing or things not being ready yet
-  - !include packages/page-bios.yaml
+  - !include packages/pages/bios.yaml
 
   # Simple clock page
-  - !include packages/page-clock.yaml
+  - !include packages/pages/clock.yaml
 
   # Page that uses lvgl-canvas-fx to render various effects (and change which in HA)
-  - !include packages/page-fx.yaml
-
-  # Page that uses lvgl-canvas-fx to render audio from the microphone as audio spectrum bars
-  - !include packages/page-audio-spectrum.yaml
-
-  # A classic
-  - !include packages/page-pong.yaml
+  - !include packages/pages/fx.yaml
