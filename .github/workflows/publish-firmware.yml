@@ -18,7 +18,7 @@ jobs:
     with:
       #### Modify below here to match your project ####
       files: ${{ matrix.file }}.factory.yaml
-      esphome-version: 2025.8.0
+      esphome-version: 2025.9.0
       combined-name: ${{ matrix.file }}
       #### Modify above here to match your project ####
 
