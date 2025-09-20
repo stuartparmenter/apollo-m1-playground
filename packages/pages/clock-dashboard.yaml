@@ -4,6 +4,12 @@
 # =========================
 # Clock + Weather + Home Status (64x64)
 # =========================
+
+lvgl_page_manager:
+  pages:
+    - page: page_clock_dashboard
+      friendly_name: "Clock Dashboard"
+
 substitutions:
   UNITS: "°"
   # vars.yaml provides:

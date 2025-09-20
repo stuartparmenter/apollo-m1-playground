@@ -6,34 +6,24 @@ time:
   - platform: homeassistant
     id: ha_time
 
-# Helper Scripts
-script:
-  - id: lvgl_next_page
-    then:
-      - lvgl.page.next:
-          animation: MOVE_LEFT
-          time: 200ms
+external_components:
+  - source: github://stuartparmenter/lvgl-page-manager@main
+    components: [lvgl_page_manager]
 
-  - id: lvgl_prev_page
-    then:
-      - lvgl.page.previous:
-          animation: MOVE_RIGHT
-          time: 200ms
+lvgl_page_manager:
+  sort: by_order
+  select:
+    name: "Select Page"
+    icon: "mdi:book-open-page-variant"
+  next_button:
+    name: "Page Next"
+    icon: "mdi:page-next"
+  prev_button:
+    name: "Page Previous"
+    icon: "mdi:page-previous"
 
 # Home Assistant–exposed buttons that call those scripts
 button:
-  - platform: template
-    name: "LVGL Next Page"
-    icon: "mdi:page-next"
-    on_press:
-      - script.execute: lvgl_next_page
-
-  - platform: template
-    name: "LVGL Previous Page"
-    icon: "mdi:page-previous"
-    on_press:
-      - script.execute: lvgl_prev_page
-
   - platform: restart
     icon: mdi:power-cycle
     name: "ESP Reboot"

@@ -6,6 +6,11 @@
 # - Target blinks when still; stays solid when moving
 # - Bottom zone LEDs reflect HA zone occupancy
 
+lvgl_page_manager:
+  pages:
+    - page: radar
+      friendly_name: "MSR-2 Radar"
+
 substitutions:
   # vars that need to be passed in to the package:
   # MSR2_PREFIX: apollo_msr_2_xxxxxx

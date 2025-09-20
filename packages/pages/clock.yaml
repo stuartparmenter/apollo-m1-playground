@@ -1,6 +1,11 @@
 # © Copyright 2025 Stuart Parmenter
 # SPDX-License-Identifier: MIT
 
+lvgl_page_manager:
+  pages:
+    - page: page_time_date
+      friendly_name: "Clock"
+
 # ---- Simple Time + Date page ----
 lvgl:
   pages:

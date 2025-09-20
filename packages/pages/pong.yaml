@@ -10,8 +10,12 @@
 # - spin based on paddle movement
 # Also: edge scoring, scoreboard (st_spleen8), serve-angle variation.
 
+lvgl_page_manager:
+  pages:
+    - page: page_pong
+      friendly_name: "Pong"
+
 substitutions:
-  PONG_PAGE_ID: "page_pong"
   PONG_BORDER: "0"
   PONG_FG: "white"
   PONG_BG: "black"
@@ -138,7 +142,7 @@ globals:
 
 lvgl:
   pages:
-    - id: ${PONG_PAGE_ID}
+    - id: page_pong
       bg_color: ${PONG_BG}
 
       on_load:

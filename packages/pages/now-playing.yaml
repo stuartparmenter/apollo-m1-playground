@@ -4,6 +4,11 @@
 # Now Playing (LVGL + DDP)
 # This is designed to work with two horizontal panels (128x64)
 
+lvgl_page_manager:
+  pages:
+    - page: now_playing
+      friendly_name: "Now Playing"
+
 substitutions:
   # MEDIA_PLAYER_ENTITY: media_player.your_media_player
   ART_CANVAS_WIDTH: "64"

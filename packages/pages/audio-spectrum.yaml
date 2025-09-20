@@ -1,6 +1,11 @@
 # © Copyright 2025 Stuart Parmenter
 # SPDX-License-Identifier: MIT
 
+lvgl_page_manager:
+  pages:
+    - page: fx_as_page
+      friendly_name: "Audio Spectrum"
+
 external_components:
   - source: github://stuartparmenter/lvgl-canvas-fx@v0.2.0
     components: [lvgl_canvas_fx]

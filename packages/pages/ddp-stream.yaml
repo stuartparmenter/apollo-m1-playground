@@ -6,6 +6,11 @@
 # Tested with ESPHome 2025.8
 # =========================================
 
+lvgl_page_manager:
+  pages:
+    - page: ddp_video
+      friendly_name: "Video (DDP)"
+
 substitutions:
   # vars.yaml provides:
   # DEFAULT_VIDEO_SRC: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"   # or "mario.gif" or https://... / file:///sd/... etc.

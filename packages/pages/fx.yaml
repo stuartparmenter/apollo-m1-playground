@@ -1,6 +1,11 @@
 # © Copyright 2025 Stuart Parmenter
 # SPDX-License-Identifier: MIT
 
+lvgl_page_manager:
+  pages:
+    - page: fx_page
+      friendly_name: "Visual FX"
+
 external_components:
   - source: github://stuartparmenter/lvgl-canvas-fx@v0.2.0
     components: [lvgl_canvas_fx]
