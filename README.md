@@ -1,53 +1,66 @@
 # Apollo M‑1 Playground
 
-ESPHome (ESP‑IDF) playground for the Apollo M‑1 HUB75 controller — base config, reusable LVGL pages/effects, and small example “apps.” Targets **ESPHome 2025.8.x** on **ESP‑IDF** (Arduino is not supported).
+ESPHome (ESP‑IDF) playground for HUB75 matrix controllers — base config, reusable LVGL pages/effects, and small example "apps." Supports **Apollo Automation M‑1** controllers and **Adafruit Matrix Portal S3**. Targets **ESPHome 2025.9.x** on **ESP‑IDF** (Arduino is not supported).
 
 ---
 
-## What’s new (Sept 2025)
-- **Refactor:** example templates removed. Two factory configs now cover hardware revisions.
-- **Releases:** GitHub Actions builds **pre‑compiled firmware** for **rev4** and **rev6** on every tagged release.
-- **On‑device config:** After adoption, all tunable variables live in the ESPHome Dashboard (Builder) for that device.
-
----
-
-## Hardware revisions
+## Supported Hardware
 Pick the file/firmware that matches your controller:
-- **rev4:** `apollo-m1/apollo-m1-rev4.factory.yaml`
-- **rev6:** `apollo-m1/apollo-m1-rev6.factory.yaml`
 
-> GitHub Releases provide prebuilt binaries for these **factory** files. After you **Adopt** the device in ESPHome Builder, it will generate a device config from `apollo-m1-rev4.yaml` or `apollo-m1-rev6.yaml`.
+### Apollo Automation M‑1 Controllers
+- **rev4:** `apollo-automation-m1-rev4.factory.yaml`
+  - ESP32-S3 with inaccessible PSRAM (effectively no PSRAM)
+  - HUB75 matrix display support
+  - No microphone or accelerometer
+
+- **rev6:** `apollo-automation-m1-rev6.factory.yaml`
+  - ESP32-S3 with 8MB PSRAM (octal)
+  - HUB75 matrix display support
+  - I²S digital microphone (GPIO 10/11/12) for audio visualization
+  - Enhanced performance with PSRAM for complex pages/effects
+
+### Adafruit Matrix Portal S3
+- **S3:** `adafruit-matrix-portal-s3.factory.yaml`
+  - ESP32-S3 with 2MB PSRAM (quad)
+  - HUB75 matrix display support
+  - Built-in accelerometer (LIS3DH) for motion-based effects
+  - I²S digital microphone for audio visualization
+
+> **Firmware vs. Config Files**: GitHub Releases provide prebuilt binaries built from the **`.factory.yaml`** files for initial flashing. After you **Adopt** the device in ESPHome Builder, it generates a device config based on the corresponding **non-factory** YAML files (e.g., `apollo-automation-m1-rev6.yaml`, `adafruit-matrix-portal-s3.yaml`).
 
 ---
 
 ## Flash prebuilt firmware (no local toolchain)
-1. Go to **[Releases](/stuartparmenter/apollo-m1-playground/releases)** and download the correct **`apollo-m1-rev[4|6]`** firmware asset for your controller.
-2. Open **https://web.esphome.io/** and connect your device via USB.
-3. Click Install and select the downloaded firmware and flash.
-4. When prompted, set Wi‑Fi credentials. The device will reboot and announce itself on the network.  If not prompted, click the 3 dots to set wifi.
-5. Add it to **Home Assistant** (it will be auto‑discovered) or **Adopt** it in the ESPHome Dashboard.
+1. Go to **https://stuartparmenter.github.io/apollo-m1-playground/** and select your controller type.
+2. Connect your device via USB and click "Install" to flash directly from your browser.
+3. When prompted, set Wi‑Fi credentials. The device will reboot and announce itself on the network.
+4. Add it to **Home Assistant** (it will be auto‑discovered) or **Adopt** it in the ESPHome Dashboard.
+
+> **Alternative**: Download firmware from [Releases](/stuartparmenter/apollo-m1-playground/releases) and use **https://web.esphome.io/** to flash manually.
 
 ---
 
 ## Build & flash locally (developers)
-Requires **ESPHome 2025.8.x** with the **ESP‑IDF** toolchain.
+Requires **ESPHome 2025.9.x** with the **ESP‑IDF** toolchain.
 
 **pip + venv (recommended)**
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate        # Linux/macOS
 # .venv\Scripts\activate        # Windows PowerShell
-pip install "esphome>=2025.8,<2025.9"
+pip install "esphome>=2025.9,<2025.10"
 
 # Build & upload (USB or OTA)
-esphome run apollo-m1/apollo-m1-rev4.factory.yaml
+esphome run apollo-automation-m1-rev4.factory.yaml
 # or
-esphome run apollo-m1/apollo-m1-rev6.factory.yaml
+esphome run apollo-automation-m1-rev6.factory.yaml
+# or
+esphome run adafruit-matrix-portal-s3.factory.yaml
 ```
 
 **Docker**
 ```bash
-docker run --rm -it -v "$PWD":/config esphome/esphome run apollo-m1/apollo-m1-rev6.factory.yaml
+docker run --rm -it -v "$PWD":/config esphome/esphome run apollo-automation-m1-rev6.factory.yaml
 ```
 
 ---
@@ -66,14 +79,21 @@ All user‑tunable settings are exposed in the **ESPHome Dashboard** for your de
 
 ## Repository layout
 ```
-apollo-m1/
-├─ apollo-m1-rev4.factory.yaml     # Factory config for rev4 (CI builds this)
-├─ apollo-m1-rev6.factory.yaml     # Factory config for rev6 (CI builds this)
-├─ packages/common-theme.yaml      # Shared LVGL theme (default font + colors)
-├─ packages/                       # Drop‑in LVGL pages/effects
-├─ src/                            # Small C/C++ helpers used by pages
+apollo-m1-playground/
+├─ apollo-automation-m1-rev4.factory.yaml    # Factory config for Apollo M‑1 rev4
+├─ apollo-automation-m1-rev6.factory.yaml    # Factory config for Apollo M‑1 rev6
+├─ adafruit-matrix-portal-s3.factory.yaml    # Factory config for Matrix Portal S3
+├─ packages/
+│  ├─ common/
+│  │  ├─ theme.yaml                # Shared LVGL theme (fonts + colors)
+│  │  ├─ ddp.yaml                  # DDP streaming functionality
+│  │  ├─ utils.yaml                # Common utilities
+│  │  └─ wizmote.yaml              # WizMote remote control support
+│  ├─ controllers/                 # Hardware‑specific configurations
+│  └─ pages/                       # Drop‑in LVGL pages/effects
 ├─ fonts/                          # Icon fonts used by pages
-├─ .github/workflows/              # CI that builds release firmware (rev4 & rev6)
+├─ static/                         # Static assets
+├─ .github/workflows/              # CI that builds release firmware
 ├─ LICENSE                         # MIT
 └─ THIRD_PARTY_LICENSES.md         # Font/icon licenses
 ```
@@ -85,26 +105,42 @@ apollo-m1/
 - **Clock • Weather • Status** — Spleen text + Material Design Icons.
 - **FX** — fireworks, fireplace, and other LVGL canvas effects.
 - **Pong** — configurable AI/speeds/sizes via substitutions.
-- **DDP Stream** — LVGL canvas fed by a UDP DDP receiver + optional WebSocket control.  
-  > ⚠️ **Note:** Requires the [lvgl-ddp-stream](https://github.com/stuartparmenter/lvgl-ddp-stream) server running on your network.
+- **DDP Stream** — LVGL canvas fed by a UDP DDP receiver + optional WebSocket control.
+  > ⚠️ **Note:** Requires [media-proxy](https://github.com/stuartparmenter/media-proxy) running on your network (available as Home Assistant addon).
 - **MSR‑2 Radar** — renders sweep/targets/LEDs based on HA entities.
 - **Microphone / Music Visualizer** — real‑time FFT bars and peaks driven by the on‑board mic.
 
 ---
 
-## External components
-- HUB75: `github://stuartparmenter/ESPHome-HUB75-MatrixDisplayWrapper`
-- DDP stream + WS control: `github://stuartparmenter/lvgl-ddp-stream`
-- LVGL Canvas FX: `github://stuartparmenter/lvgl-canvas-fx`
-- Chipmunk2D ESPHome: `github://stuartparmenter/chipmunk2d-esphome`
+## WizMote Remote Control
 
-> For reproducible builds, prefer **tags** or **commit SHAs** rather than a moving branch.
+The project includes support for WizMote remotes using ESPHome's built‑in ESP‑NOW protocol (requires ESPHome 2025.8+).
+
+### Simple Setup Process
+1. **Include WizMote Package**: Add `packages/common/wizmote.yaml` to your device configuration
+2. **Turn on "WizMote Auto‑Discovery"** in Home Assistant
+3. **Press any button on your WizMote** — MAC gets auto‑discovered and auto‑paired
+4. **Done!** Discovery mode automatically turns off and WizMote is ready to use
+
+### Button Functions
+- **ON/OFF**: Display power control
+- **Brightness Up/Down**: Adjust display brightness
+- **Night**: Set minimum brightness
+- **Buttons 1‑4**: Direct page navigation (configurable)
+
+### Status
+View pairing status via the "WizMote Status" entity in Home Assistant.
 
 ---
 
-## ESP‑IDF notes
-- This project is **ESP‑IDF only**; avoid Arduino headers.
-- **Memory:** rev6 boards use PSRAM; rev4 boards do not. The correct factory file handles this automatically—no manual toggles needed.
+## External components
+- **HUB75 Display Driver**: `github://stuartparmenter/ESPHome-HUB75-MatrixDisplayWrapper`
+- **DDP Stream + WebSocket Control**: `github://stuartparmenter/lvgl-ddp-stream`
+- **LVGL Canvas Effects**: `github://stuartparmenter/lvgl-canvas-fx`
+- **Physics Engine**: `github://stuartparmenter/chipmunk2d-esphome`
+- **Page Manager**: `github://stuartparmenter/lvgl-page-manager`
+
+> For reproducible builds, prefer **tags** or **commit SHAs** rather than a moving branch.
 
 ---
 
