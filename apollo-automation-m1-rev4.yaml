@@ -50,6 +50,14 @@ packages:
           WS_DDP_HOST: "homeassistant.local"
           WS_DDP_PORT: "8788"
 
+      # WiZ Smart Remote Support
+      - path: packages/common/wizmote.yaml
+        vars:
+          WIZMOTE_PAGE_1: "page_time_date"  # packages/pages/clock.yaml
+          WIZMOTE_PAGE_2: "fx_page"         # packages/pages/fx.yaml
+          WIZMOTE_PAGE_3: "page_pong"       # packages/pages/pong.yaml
+          WIZMOTE_PAGE_4: "ddp_video"       # packages/pages/ddp-stream.yaml
+
       # Basic Boot Screen to avoid flashing or things not being ready yet
       - path: packages/pages/bios.yaml
 
@@ -78,7 +86,7 @@ packages:
       - path: packages/pages/fx.yaml
 
       # A classic
-      # - path: packages/pages/pong.yaml
+      - path: packages/pages/pong.yaml
 
       # Visualize your Apollo Automation MSR-2
       # - path: packages/pages/msr-2-radar.yaml

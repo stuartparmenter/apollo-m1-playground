@@ -1,0 +1,416 @@
+# © Copyright 2025 Stuart Parmenter
+# SPDX-License-Identifier: MIT
+
+# WizMote remote support using built-in ESPHome ESP-NOW
+# Provides MAC filtering and lvgl_page_manager integration
+# WizMote sends broadcast messages, so all processing happens in on_broadcast
+
+substitutions:
+  # These need to be passed in:
+  # WIZMOTE_PAGE_1: "page_time_date"
+  # WIZMOTE_PAGE_2: "fx_page"
+  # WIZMOTE_PAGE_3: "page_pong"
+  # WIZMOTE_PAGE_4: "ddp_video"
+
+  # WizMote button mappings
+  WIZMOTE_BUTTON_ON: "1"
+  WIZMOTE_BUTTON_OFF: "2"
+  WIZMOTE_BUTTON_NIGHT: "3"
+  WIZMOTE_BUTTON_ONE: "113"
+  WIZMOTE_BUTTON_TWO: "72"
+  WIZMOTE_BUTTON_THREE: "40"
+  WIZMOTE_BUTTON_FOUR: "129"
+  WIZMOTE_BUTTON_BRIGHT_UP: "9"
+  WIZMOTE_BUTTON_BRIGHT_DOWN: "8"
+
+  # Default WizMote MAC address
+  WIZMOTE_MAC_ADDRESS: "00:00:00:00:00:00"
+
+  # Brightness control settings
+  WIZMOTE_BRIGHTNESS_STEP: "10"  # Percentage step for brightness changes
+  WIZMOTE_BRIGHTNESS_MIN_STEP: "5"  # Minimum step in actual values
+
+  # Debounce settings
+  WIZMOTE_DEBOUNCE_MS: "200"  # Debounce timeout in milliseconds
+
+# Globals for duplicate detection and MAC tracking
+globals:
+  - id: wizmote_last_sequence
+    type: int
+    initial_value: '0'
+  - id: wizmote_previous_mac
+    type: std::string
+    initial_value: '""'
+
+# Script to process WizMote button actions
+script:
+  - id: process_wizmote_button
+    parameters:
+      button: int
+    then:
+      # Device selection buttons (16-19)
+      - if:
+          condition:
+            lambda: 'return button >= 16 && button <= 19;'
+          then:
+            - lambda: 'ESP_LOGI("wizmote", "Device selection button %d pressed", button);'
+            - if:
+                condition:
+                  lambda: 'return button == 16;'
+                then:
+                  - lvgl_page_manager.page.show:
+                      page: ${WIZMOTE_PAGE_1}
+            - if:
+                condition:
+                  lambda: 'return button == 17;'
+                then:
+                  - lvgl_page_manager.page.show:
+                      page: ${WIZMOTE_PAGE_2}
+            - if:
+                condition:
+                  lambda: 'return button == 18;'
+                then:
+                  - lvgl_page_manager.page.show:
+                      page: ${WIZMOTE_PAGE_3}
+            - if:
+                condition:
+                  lambda: 'return button == 19;'
+                then:
+                  - lvgl_page_manager.page.show:
+                      page: ${WIZMOTE_PAGE_4}
+
+      # Power control buttons
+      - if:
+          condition:
+            lambda: 'return button == 1;'  # ON button
+          then:
+            - switch.turn_on: power
+
+      - if:
+          condition:
+            lambda: 'return button == 2;'  # OFF button
+          then:
+            - switch.turn_off: power
+
+      # Brightness control buttons
+      - if:
+          condition:
+            lambda: 'return button == 9;'  # BRIGHT_UP
+          then:
+            - lambda: |-
+                float current = id(brightness).state;
+                float step_percent = ${WIZMOTE_BRIGHTNESS_STEP} / 100.0f;
+                float min_step = ${WIZMOTE_BRIGHTNESS_MIN_STEP};
+                float new_brightness = std::min(255.0f, current + std::max(min_step, 255.0f * step_percent));
+                auto call = id(brightness).make_call();
+                call.set_value(new_brightness);
+                call.perform();
+                ESP_LOGI("wizmote", "Brightness increased: %.0f -> %.0f", current, new_brightness);
+
+      - if:
+          condition:
+            lambda: 'return button == 8;'  # BRIGHT_DOWN
+          then:
+            - lambda: |-
+                float current = id(brightness).state;
+                float step_percent = ${WIZMOTE_BRIGHTNESS_STEP} / 100.0f;
+                float min_step = ${WIZMOTE_BRIGHTNESS_MIN_STEP};
+                float new_brightness = std::max(1.0f, current - std::max(min_step, 255.0f * step_percent));
+                auto call = id(brightness).make_call();
+                call.set_value(new_brightness);
+                call.perform();
+                ESP_LOGI("wizmote", "Brightness decreased: %.0f -> %.0f", current, new_brightness);
+
+      - if:
+          condition:
+            lambda: 'return button == 3;'  # NIGHT
+          then:
+            - lambda: |-
+                auto call = id(brightness).make_call();
+                call.set_value(1.0f);
+                call.perform();
+                ESP_LOGI("wizmote", "Night mode: brightness set to minimum");
+
+# ESP-NOW configuration for WizMote communication
+espnow:
+  id: espnow_component
+  auto_add_peer: false
+  enable_on_boot: true
+  on_unknown_peer:
+    then:
+      - lambda: |-
+          // Extract sender MAC from ESP-NOW info structure
+          std::string sender_mac;
+          char mac_str[18];
+          snprintf(mac_str, sizeof(mac_str), "%02x:%02x:%02x:%02x:%02x:%02x",
+                   info.src_addr[0], info.src_addr[1], info.src_addr[2],
+                   info.src_addr[3], info.src_addr[4], info.src_addr[5]);
+          sender_mac = std::string(mac_str);
+
+          bool discovery_mode = id(wizmote_discovery_mode).state;
+
+          ESP_LOGD("wizmote", "UNKNOWN PEER: Received ESP-NOW data from %s, length: %d",
+                   sender_mac.c_str(), size);
+
+          // WizMote protocol: expect 13 bytes
+          if (size != 13) {
+            ESP_LOGW("wizmote", "Unknown peer sent invalid packet size: %d", size);
+            return;
+          }
+
+          uint8_t button = data[12];
+
+          // Discovery mode: auto-discover and pair WizMotes
+          if (discovery_mode) {
+            ESP_LOGW("wizmote", "🔍 DISCOVERY: WizMote MAC: %s, Button: %d", sender_mac.c_str(), button);
+
+            // Auto-set MAC address and pair the WizMote
+            std::string current_mac = id(wizmote_mac_address).state;
+            if (current_mac == "00:00:00:00:00:00" || current_mac == "" || current_mac != sender_mac) {
+              ESP_LOGI("wizmote", "🔄 Auto-setting discovered WizMote MAC: %s", sender_mac.c_str());
+              auto call = id(wizmote_mac_address).make_call();
+              call.set_value(sender_mac);
+              call.perform();
+
+              // Turn off discovery mode
+              id(wizmote_discovery_mode).turn_off();
+              ESP_LOGI("wizmote", "✅ WizMote auto-discovered! Pairing handled by MAC address update.");
+            }
+            return;
+          }
+
+          ESP_LOGI("wizmote", "🔍 UNKNOWN WizMote: MAC: %s, Button: %d (enable discovery mode to pair)", sender_mac.c_str(), button);
+
+  on_broadcast:
+    then:
+      - lambda: |-
+          // Extract sender MAC from ESP-NOW info structure
+          std::string sender_mac;
+          char mac_str[18];
+          snprintf(mac_str, sizeof(mac_str), "%02x:%02x:%02x:%02x:%02x:%02x",
+                   info.src_addr[0], info.src_addr[1], info.src_addr[2],
+                   info.src_addr[3], info.src_addr[4], info.src_addr[5]);
+          sender_mac = std::string(mac_str);
+
+          // Check if this is a WizMote message and from our paired device
+          if (size == 13) {
+            std::string configured_mac = id(wizmote_mac_address).state;
+
+            // Convert configured MAC to lowercase for comparison
+            std::transform(configured_mac.begin(), configured_mac.end(), configured_mac.begin(), ::tolower);
+
+            if (configured_mac != "00:00:00:00:00:00" && configured_mac != "" && sender_mac == configured_mac) {
+              ESP_LOGV("wizmote", "Processing WizMote broadcast from paired device %s", sender_mac.c_str());
+
+              // data[0] -> packet.program
+              // data[1-4] -> packet.sequence (32-bit little endian)
+              // data[5] -> packet.data_type_1 (should be 32)
+              // data[6] -> packet.button
+              // data[7] -> packet.data_type_2 (should be 1)
+              // data[8] -> packet.battery
+              // data[9-12] -> packet.ccm_mac
+
+              uint8_t program = data[0];
+              uint32_t sequence = (data[4] << 24) | (data[3] << 16) | (data[2] << 8) | data[1];
+              uint8_t data_type_1 = data[5];
+              uint8_t button = data[6];
+              uint8_t data_type_2 = data[7];
+              uint8_t battery = data[8];
+
+              ESP_LOGV("wizmote", "WizMote structure: program=0x%02x, seq=%d, dt1=%d, button=%d, dt2=%d, battery=%d",
+                       program, sequence, data_type_1, button, data_type_2, battery);
+
+              ESP_LOGV("wizmote", "WizMote packet dump: [%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x]",
+                       data[0], data[1], data[2], data[3], data[4], data[5], data[6],
+                       data[7], data[8], data[9], data[10], data[11], data[12]);
+
+              // Sequence-based duplicate detection
+              int last_sequence = id(wizmote_last_sequence);
+              if (sequence == last_sequence) {
+                ESP_LOGV("wizmote", "Duplicate WizMote packet (sequence: %d, button: %d)", sequence, button);
+                return;
+              }
+
+              // Update sequence tracking
+              id(wizmote_last_sequence) = sequence;
+
+              ESP_LOGI("wizmote", "WizMote button pressed: %d seq=%d (from paired broadcast %s)", button, sequence, sender_mac.c_str());
+
+              id(process_wizmote_button).execute(button);
+            } else {
+              ESP_LOGD("wizmote", "WizMote broadcast from non-paired device: %s (configured: %s)",
+                       sender_mac.c_str(), configured_mac.c_str());
+            }
+          } else {
+            ESP_LOGD("wizmote", "ESP-NOW broadcast (non-WizMote, length: %d)", size);
+          }
+
+
+# WizMote pairing is automatically restored on boot
+
+# Template text entity for MAC address pairing
+text:
+  - platform: template
+    name: "WizMote MAC Address"
+    id: wizmote_mac_address
+    icon: "mdi:remote"
+    entity_category: config
+    initial_value: "${WIZMOTE_MAC_ADDRESS}"
+    optimistic: true
+    restore_value: true
+    mode: text
+    min_length: 17
+    max_length: 17
+    on_value:
+      - lambda: |-
+          // Validate MAC address format (length enforced by min/max_length)
+          std::string mac = x;
+
+          bool valid_format = true;
+          for (int i = 0; i < 17; i++) {
+            if (i % 3 == 2) {
+              if (mac[i] != ':') {
+                valid_format = false;
+                break;
+              }
+            } else {
+              if (!std::isxdigit(mac[i])) {
+                valid_format = false;
+                break;
+              }
+            }
+          }
+
+          if (valid_format) {
+            ESP_LOGI("wizmote", "WizMote MAC address updated: %s", mac.c_str());
+          } else {
+            ESP_LOGW("wizmote", "Invalid MAC address format: %s (should be aa:bb:cc:dd:ee:ff)", mac.c_str());
+            return;
+          }
+
+      # Remove old MAC if it exists
+      - if:
+          condition:
+            lambda: 'return (id(wizmote_previous_mac) != "" && id(wizmote_previous_mac) != "00:00:00:00:00:00");'
+          then:
+            - espnow.peer.delete:
+                address: !lambda |-
+                  std::string mac = id(wizmote_previous_mac);
+                  std::array<uint8_t, 6> mac_bytes;
+                  sscanf(mac.c_str(), "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+                         &mac_bytes[0], &mac_bytes[1], &mac_bytes[2],
+                         &mac_bytes[3], &mac_bytes[4], &mac_bytes[5]);
+                  return mac_bytes;
+            - logger.log:
+                format: "Removed old WizMote pairing: %s"
+                args: ['id(wizmote_previous_mac).c_str()']
+
+      # Add new MAC if it's valid
+      - if:
+          condition:
+            lambda: 'return (x != "00:00:00:00:00:00" && x != "");'
+          then:
+            - espnow.peer.add:
+                address: !lambda |-
+                  std::string mac = x;
+                  std::array<uint8_t, 6> mac_bytes;
+                  sscanf(mac.c_str(), "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+                         &mac_bytes[0], &mac_bytes[1], &mac_bytes[2],
+                         &mac_bytes[3], &mac_bytes[4], &mac_bytes[5]);
+                  return mac_bytes;
+            - logger.log:
+                format: "✅ WizMote paired: %s"
+                args: ['x.c_str()']
+
+      # Update previous MAC tracker
+      - lambda: 'id(wizmote_previous_mac) = x;'
+      # Update status sensor when MAC changes
+      - lambda: 'id(wizmote_status).update();'
+
+
+# Manual control buttons
+button:
+  - platform: template
+    name: "Clear WizMote Pairing"
+    id: wizmote_clear_button
+    icon: "mdi:close-circle"
+    entity_category: config
+    on_press:
+      - lambda: |-
+          std::string mac = id(wizmote_mac_address).state;
+          if (mac != "00:00:00:00:00:00" && mac != "" && mac.length() == 17) {
+            std::array<uint8_t, 6> mac_bytes;
+            int parsed = sscanf(mac.c_str(), "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+                               &mac_bytes[0], &mac_bytes[1], &mac_bytes[2],
+                               &mac_bytes[3], &mac_bytes[4], &mac_bytes[5]);
+
+            if (parsed == 6) {
+              id(espnow_component).del_peer(mac_bytes.data());
+              ESP_LOGI("wizmote", "WizMote unpaired: %s", mac.c_str());
+            }
+          }
+
+          id(wizmote_mac_address).publish_state("00:00:00:00:00:00");
+          ESP_LOGI("wizmote", "✅ WizMote pairing cleared");
+      # Update status sensor when pairing is cleared
+      - lambda: 'id(wizmote_status).update();'
+
+
+# Boot pairing restoration
+esphome:
+  on_boot:
+    - priority: -200
+      then:
+        - delay: 2s
+        - if:
+            condition:
+              lambda: |-
+                std::string mac = id(wizmote_mac_address).state;
+                return (mac != "00:00:00:00:00:00" && mac != "");
+            then:
+              - logger.log: "Restoring WizMote pairing on boot..."
+              - espnow.peer.add:
+                  address: !lambda |-
+                    std::string mac = id(wizmote_mac_address).state;
+                    std::array<uint8_t, 6> mac_bytes;
+                    sscanf(mac.c_str(), "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+                           &mac_bytes[0], &mac_bytes[1], &mac_bytes[2],
+                           &mac_bytes[3], &mac_bytes[4], &mac_bytes[5]);
+                    return mac_bytes;
+              - logger.log:
+                  format: "✅ WizMote pairing restored: %s"
+                  args: ['id(wizmote_mac_address).state.c_str()']
+
+# Auto-discovery mode - turn on, press any WizMote button, get auto-paired!
+switch:
+  - platform: template
+    name: "WizMote Auto-Discovery"
+    id: wizmote_discovery_mode
+    icon: "mdi:radar"
+    entity_category: config
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+    on_turn_on:
+      - lambda: 'id(wizmote_status).update();'
+    on_turn_off:
+      - lambda: 'id(wizmote_status).update();'
+
+# Status display
+text_sensor:
+  - platform: template
+    name: "WizMote Status"
+    id: wizmote_status
+    icon: "mdi:information"
+    entity_category: diagnostic
+    lambda: |-
+      std::string mac = id(wizmote_mac_address).state;
+      bool discovery = id(wizmote_discovery_mode).state;
+
+      if (discovery) {
+        return std::string("🔍 Discovery mode: Press any WizMote button");
+      } else if (mac == "00:00:00:00:00:00" || mac == "") {
+        return std::string("❌ No WizMote paired");
+      } else {
+        return std::string("✅ Paired: " + mac);
+      }
+    update_interval: 300s

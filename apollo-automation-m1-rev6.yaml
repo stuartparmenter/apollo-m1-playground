@@ -50,6 +50,14 @@ packages:
           WS_DDP_HOST: "homeassistant.local"
           WS_DDP_PORT: "8788"
 
+      # WizMote remote support
+      - path: packages/common/wizmote.yaml
+        vars:
+          WIZMOTE_PAGE_1: "page_time_date"  # packages/pages/clock.yaml
+          WIZMOTE_PAGE_2: "fx_page"         # packages/pages/fx.yaml
+          WIZMOTE_PAGE_3: "page_pong"       # packages/pages/pong.yaml
+          WIZMOTE_PAGE_4: "ddp_video"       # packages/pages/ddp-stream.yaml
+
       # Basic Boot Screen to avoid flashing or things not being ready yet
       - path: packages/pages/bios.yaml
 
