@@ -42,7 +42,9 @@ display:
     R2_pin: GPIO38
     G2_pin: GPIO39
     B2_pin: GPIO37
-    A_pin:  GPIO45
+    A_pin:
+      number: GPIO45
+      ignore_strapping_warning: true
     B_pin:  GPIO36
     C_pin:  GPIO48
     D_pin:  GPIO35

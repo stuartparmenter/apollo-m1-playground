@@ -38,7 +38,9 @@ display:
     R2_pin: 38
     G2_pin: 39
     B2_pin: 37
-    A_pin: 45
+    A_pin:
+      number: 45
+      ignore_strapping_warning: true
     B_pin: 36
     C_pin: 48
     D_pin: 35
