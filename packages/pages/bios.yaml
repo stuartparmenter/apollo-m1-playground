@@ -109,16 +109,14 @@ lvgl:
                 styles: [st_spleen8]
                 text: !lambda |-
                   #include "esp_heap_caps.h"
-                  size_t ram_total   = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
-                  size_t psram_total = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);  // 0 if no PSRAM
-                  char buf[32];
-                  if (psram_total > 0) {
-                    snprintf(buf, sizeof(buf), "MEM:%luk+%luk",
-                             (unsigned long)(ram_total / 1024),
-                             (unsigned long)(psram_total / 1024));
-                  } else {
-                    snprintf(buf, sizeof(buf), "MEM:%luk", (unsigned long)(ram_total / 1024));
-                  }
+
+                  // Get actual memory sizes
+                  size_t internal_total = heap_caps_get_total_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+                  size_t psram_total = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
+
+                  char buf[16];
+                  size_t total_ram = internal_total + psram_total;
+                  snprintf(buf, sizeof(buf), "RAM:%luk", (unsigned long)(total_ram / 1024));
                   return std::string(buf);
             - label:
                 id: bios_id
