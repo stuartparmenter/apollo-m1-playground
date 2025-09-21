@@ -29,6 +29,20 @@ button:
     name: "ESP Reboot"
     entity_category: "diagnostic"
 
+# Matrix display controls
+switch:
+  - platform: hub75_matrix_display
+    matrix_id: matrix
+    name: "Power"
+    restore_mode: ALWAYS_ON
+    id: power
+
+number:
+  - platform: hub75_matrix_display
+    matrix_id: matrix
+    name: "Brightness"
+    id: brightness
+
 # Memory reporting sensor
 sensor:
   - platform: template

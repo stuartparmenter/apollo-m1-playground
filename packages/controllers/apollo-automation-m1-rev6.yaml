@@ -84,12 +84,6 @@ display:
     update_interval: never
 
 switch:
-  - platform: hub75_matrix_display
-    matrix_id: matrix
-    name: "Power"
-    restore_mode: ALWAYS_ON
-    id: power
-
   - platform: template
     id: mic_mute_sw
     name: "Microphone Enabled"
@@ -101,11 +95,6 @@ switch:
       - microphone.unmute: m1_mic
     turn_off_action:
       - microphone.mute: m1_mic
-
-number:
-  - platform: hub75_matrix_display
-    matrix_id: matrix
-    name: "Brightness"
 
 lvgl:
   buffer_size: 100%

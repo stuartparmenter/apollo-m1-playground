@@ -52,18 +52,6 @@ display:
     auto_clear_enabled: false
     update_interval: never
 
-switch:
-  - platform: hub75_matrix_display
-    matrix_id: matrix
-    name: "Power"
-    restore_mode: ALWAYS_ON
-    id: power
-
-number:
-  - platform: hub75_matrix_display
-    matrix_id: matrix
-    name: "Brightness"
-
 lvgl:
   buffer_size: 100%
   displays:
