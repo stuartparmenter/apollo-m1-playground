@@ -76,8 +76,11 @@ text:
     optimistic: true
     initial_value: ${DEFAULT_VIDEO_SRC}
     mode: text
+    min_length: 4
+    max_length: 255
     restore_value: true
     on_value:
       then:
-        - lambda: |-
-            id(ws_ddp).set_src(${OUT_ID}, x.c_str());
+        - ws_ddp_control.set_src:
+            output_id: ${OUT_ID}
+            src: !lambda "return x;"
