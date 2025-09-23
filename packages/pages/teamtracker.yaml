@@ -19,28 +19,30 @@ substitutions:
   TEAM_LOGO_Y: "0"
   AWAY_LOGO_X: "0"
   HOME_LOGO_X: "32"
-  NFL_OUT_ID_AWAY: "20"
-  NFL_OUT_ID_HOME: "21"
 
 
 # DDP sink + canvas binding for team logos
 ddp_stream:
+  id: ddp
   streams:
-    - id: ${NFL_OUT_ID_AWAY}
-      canvas_id: "away_logo_canvas_${uid}"
+    - id: stream_away_${uid}
+      canvas: "away_logo_canvas_${uid}"
       back_buffers: 0
-    - id: ${NFL_OUT_ID_HOME}
-      canvas_id: "home_logo_canvas_${uid}"
+    - id: stream_home_${uid}
+      canvas: "home_logo_canvas_${uid}"
       back_buffers: 0
 
 # WebSocket control for logo streaming
 ws_ddp_control:
+  id: ws_ddp
   outputs:
-    - id: ${NFL_OUT_ID_AWAY}
+    - id: output_away_${uid}
+      ddp_stream: stream_away_${uid}
       src: ""
       loop: false
       format: rgb565
-    - id: ${NFL_OUT_ID_HOME}
+    - id: output_home_${uid}
+      ddp_stream: stream_home_${uid}
       src: ""
       loop: false
       format: rgb565
@@ -99,7 +101,7 @@ text_sensor:
     internal: true
     on_value:
       - ws_ddp_control.set_src:
-          output_id: ${NFL_OUT_ID_AWAY}
+          id: output_away_${uid}
           src: !lambda "return x;"
 
   - platform: homeassistant
@@ -135,7 +137,7 @@ text_sensor:
     internal: true
     on_value:
       - ws_ddp_control.set_src:
-          output_id: ${NFL_OUT_ID_HOME}
+          id: output_home_${uid}
           src: !lambda "return x;"
 
   - platform: homeassistant
@@ -281,5 +283,5 @@ lvgl:
       on_load:
         then:
           - lambda: |-
-              id(ws_ddp).start(${NFL_OUT_ID_AWAY});
-              id(ws_ddp).start(${NFL_OUT_ID_HOME});
+              id(output_away_${uid}).start();
+              id(output_home_${uid}).start();

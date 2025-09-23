@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 external_components:
-  - source: github://stuartparmenter/lvgl-ddp-stream@v0.4.3
+  - source: github://stuartparmenter/lvgl-ddp-stream@v0.5.0
     components: [ddp_stream, ws_ddp_control]
 
 # DDP Canvas Binding

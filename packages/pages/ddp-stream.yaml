@@ -16,23 +16,23 @@ substitutions:
   # DEFAULT_VIDEO_SRC: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"   # or "mario.gif" or https://... / file:///sd/... etc.
   CANVAS_WIDTH: ${DISPLAY_W}
   CANVAS_HEIGHT: ${DISPLAY_H}
-  OUT_ID: "1"
 
 # UDP DDP sink + canvas bindings (no w/h required here)
 ddp_stream:
+  id: ddp
   streams:
-    - id: ${OUT_ID}
-      canvas_id: "video_canvas"
+    - id: stream_video
+      canvas: "video_canvas"
       back_buffers: ${BACK_BUFFERS}  # 0-2
-    # - id: 2
-    #   canvas_id: "canvas32"
 
 # -----------------------------
 # WebSocket control
 # -----------------------------
 ws_ddp_control:
+  id: ws_ddp
   outputs:
-    - id: ${OUT_ID}
+    - id: output_video
+      ddp_stream: stream_video
       src: ${DEFAULT_VIDEO_SRC}
       # width/height optional; if omitted, auto from canvas
       # width: 64
@@ -43,8 +43,6 @@ ws_ddp_control:
       # loop: true
       # hw: auto
       format: rgb565
-    # - id: 2
-    #   src: ${VIDEO_SRC_2}
 
 # -----------------------------
 # LVGL page with a single canvas
@@ -60,11 +58,11 @@ lvgl:
       on_load:
         then:
           - lambda: |-
-              id(ws_ddp).start(${OUT_ID});
+              id(output_video).start();
       on_unload:
         then:
           - lambda: |-
-              id(ws_ddp).stop(${OUT_ID});
+              id(output_video).stop();
 
 # -----------------------------
 # Runtime source change
@@ -82,5 +80,5 @@ text:
     on_value:
       then:
         - ws_ddp_control.set_src:
-            output_id: ${OUT_ID}
+            id: output_video
             src: !lambda "return x;"

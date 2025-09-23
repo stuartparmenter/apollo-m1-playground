@@ -15,7 +15,6 @@ substitutions:
   ART_CANVAS_HEIGHT: "64"
   ART_X: "64"
   ART_Y: "0"
-  NP_OUT_ID: "11"
   DEFAULT_ART_SRC: "https://placehold.co/64x64/000/FFF/png"
 
 script:
@@ -181,7 +180,7 @@ script:
           std::string full = normalize_ha_image_url(path_or_url, base);
           if (id(last_art_url) == full) return;
           id(art_src_ctl) = full;
-          id(ws_ddp).set_src(${NP_OUT_ID}, id(art_src_ctl).c_str());
+          id(output_art).set_src(id(art_src_ctl).c_str());
           id(last_art_url) = id(art_src_ctl);
 
 globals:
@@ -202,15 +201,18 @@ globals:
 
 # DDP sink + canvas binding
 ddp_stream:
+  id: ddp
   streams:
-    - id: ${NP_OUT_ID}
-      canvas_id: "art_canvas"
+    - id: stream_art
+      canvas: "art_canvas"
       back_buffers: 0
 
 # WebSocket control for artwork streaming
 ws_ddp_control:
+  id: ws_ddp
   outputs:
-    - id: ${NP_OUT_ID}
+    - id: output_art
+      ddp_stream: stream_art
       src: ${DEFAULT_ART_SRC}
       loop: false
       format: rgb565
@@ -291,7 +293,7 @@ sensor:
           then:
             - lambda: |-
                 id(art_src_ctl) = id(ha_entity_picture).state;
-                id(ws_ddp).set_src(${NP_OUT_ID}, id(art_src_ctl).c_str());
+                id(output_art).set_src(id(art_src_ctl).c_str());
                 id(last_art_url) = id(art_src_ctl);
 
   - platform: homeassistant
@@ -519,7 +521,7 @@ lvgl:
       on_load:
         then:
           - lambda: |-
-              id(ws_ddp).start(${NP_OUT_ID});
+              id(output_art).start();
           - if:
               condition:
                 lambda: 'return id(ha_media_title).has_state();'
@@ -553,7 +555,7 @@ lvgl:
               then:
                 - lambda: |-
                     id(art_src_ctl) = id(ha_entity_picture).state;
-                    id(ws_ddp).set_src(${NP_OUT_ID}, id(art_src_ctl).c_str());
+                    id(output_art).set_src(id(art_src_ctl).c_str());
                     id(last_art_url) = id(art_src_ctl);
           - lambda: |-
               lv_obj_set_style_anim_speed(id(title_lbl), 7, LV_PART_MAIN);
