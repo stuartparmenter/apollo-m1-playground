@@ -5,13 +5,14 @@
 # Displays team logos, scores, and game status
 #
 # Required vars:
+#   page_friendly_name: Name of the page (e.g., Team Tracker - Falcons)
 #   entity_id: Home Assistant team tracker sensor (e.g., sensor.team_tracker_nfl_falcons)
 #   uid: Unique identifier for this instance (e.g., "falcons")
 
 lvgl_page_manager:
   pages:
     - page: teamtracker_${uid}
-      friendly_name: "Team Tracker ${uid}"
+      friendly_name: "${page_friendly_name}"
 
 substitutions:
   # Page-specific configuration
