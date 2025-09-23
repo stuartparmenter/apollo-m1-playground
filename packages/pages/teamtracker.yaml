@@ -205,11 +205,11 @@ text_sensor:
 
 lvgl:
   style_definitions:
-    - id: st_team_text
+    - id: st_team_text_${uid}
       text_opa: 90%
-    - id: st_score_text
+    - id: st_score_text_${uid}
       text_opa: 100%
-    - id: st_status_text
+    - id: st_status_text_${uid}
       text_opa: 75%
 
   pages:
@@ -240,7 +240,7 @@ lvgl:
             width: 32
             text_align: CENTER
             text: "AWAY"
-            styles: [st_spleen8, st_team_text]
+            styles: ["st_team_text_${uid}"]
 
         - label:
             id: away_score_lbl_${uid}
@@ -249,7 +249,7 @@ lvgl:
             width: 32
             text_align: CENTER
             text: "0"
-            styles: [st_spleen8, st_score_text]
+            styles: ["st_score_text_${uid}"]
 
         # Home team name and score (right side)
         - label:
@@ -259,7 +259,7 @@ lvgl:
             width: 32
             text_align: CENTER
             text: "HOME"
-            styles: [st_spleen8, st_team_text]
+            styles: ["st_team_text_${uid}"]
 
         - label:
             id: home_score_lbl_${uid}
@@ -268,7 +268,7 @@ lvgl:
             width: 32
             text_align: CENTER
             text: "0"
-            styles: [st_spleen8, st_score_text]
+            styles: ["st_score_text_${uid}"]
 
         # Game status (bottom)
         - label:
@@ -278,7 +278,7 @@ lvgl:
             width: 64
             text_align: CENTER
             text: "Game Status"
-            styles: [st_spleen8, st_status_text]
+            styles: ["st_status_text_${uid}"]
 
       on_load:
         then:
