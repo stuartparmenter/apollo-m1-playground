@@ -1,0 +1,27 @@
+# © Copyright 2025 Stuart Parmenter
+# SPDX-License-Identifier: MIT
+
+# QR Code Page
+# Displays a full-screen QR code
+#
+# Required vars:
+#   page_friendly_name: Name of the page (e.g., "QR Code - GitHub")
+#   qr_code_text: Text/URL to encode in QR code
+#   uid: Unique identifier for this instance (e.g., "github")
+
+lvgl_page_manager:
+  pages:
+    - page: qr_${uid}
+      friendly_name: "${page_friendly_name}"
+
+lvgl:
+  pages:
+    - id: qr_${uid}
+      bg_color: 0x000000
+      widgets:
+        - qrcode:
+            id: qr_code_${uid}
+            x: 0
+            y: 0
+            size: 64
+            text: "${qr_code_text}"
