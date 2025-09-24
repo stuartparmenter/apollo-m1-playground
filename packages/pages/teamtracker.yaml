@@ -58,21 +58,25 @@ script:
           std::string kickoff_in = id(ha_kickoff_in_${uid}).has_state() ? id(ha_kickoff_in_${uid}).state : "";
           std::string game_clock = id(ha_game_clock_${uid}).has_state() ? id(ha_game_clock_${uid}).state : "";
           std::string quarter = id(ha_game_quarter_${uid}).has_state() ? id(ha_game_quarter_${uid}).state : "";
+          std::string sport = id(ha_sport_name_${uid}).has_state() ? id(ha_sport_name_${uid}).state : "";
 
           if (game_state == "PRE") {
             // Pre-game: show kickoff time
             status_text = kickoff_in;
           } else if (game_state == "IN") {
             // In-game: show period/quarter and clock
-            if (!quarter.empty() && !game_clock.empty()) {
-              status_text = "Q" + quarter + " " + game_clock;
-            } else if (!quarter.empty()) {
-              status_text = "Q" + quarter;
-            } else if (!game_clock.empty()) {
+            if (sport == "hockey") {
               status_text = game_clock;
             } else {
-              status_text = "In Progress";
-            }
+              if (!quarter.empty() && !game_clock.empty()) {
+                status_text = "Q" + quarter + " " + game_clock;
+              } else if (!quarter.empty()) {
+                status_text = "Q" + quarter;
+              } else if (!game_clock.empty()) {
+                status_text = game_clock;
+              } else {
+                status_text = "In Progress";
+              }
           } else if (game_state == "POST") {
             // Post-game: show clock (typically "Final")
             status_text = !game_clock.empty() ? game_clock : "Final";
@@ -155,6 +159,12 @@ text_sensor:
     id: ha_event_name_${uid}
     entity_id: ${entity_id}
     attribute: event_name
+    internal: true
+
+  - platform: homeassistant
+    id: ha_sport_name_${uid}
+    entity_id: ${entity_id}
+    attribute: sport
     internal: true
 
   - platform: homeassistant
