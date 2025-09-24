@@ -29,6 +29,7 @@ substitutions:
   # Brightness control settings
   WIZMOTE_BRIGHTNESS_STEP: "10"  # Percentage step for brightness changes
   WIZMOTE_BRIGHTNESS_MIN_STEP: "5"  # Minimum step in actual values
+  WIZMOTE_BRIGHTNESS_NIGHT: "20"  # Default night setting
 
   # Debounce settings
   WIZMOTE_DEBOUNCE_MS: "200"  # Debounce timeout in milliseconds
@@ -127,7 +128,7 @@ script:
           then:
             - lambda: |-
                 auto call = id(brightness).make_call();
-                call.set_value(1.0f);
+                call.set_value(${WIZMOTE_BRIGHTNESS_NIGHT});
                 call.perform();
                 ESP_LOGI("wizmote", "Night mode: brightness set to minimum");
 
