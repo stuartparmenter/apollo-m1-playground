@@ -64,22 +64,10 @@ script:
             // Pre-game: show kickoff time
             status_text = kickoff_in;
           } else if (game_state == "IN") {
-            // In-game: show period/quarter and clock
-            if (sport == "baseball" || sport == "hockey") {
-              // Baseball/Hockey: just show the clock (e.g., "Top 9th", "2nd Period")
-              status_text = !game_clock.empty() ? game_clock : "In Progress";
-            } else {
-              // Football and other sports
-              if (!quarter.empty() && !game_clock.empty()) {
-                status_text = "Q" + quarter + " " + game_clock;
-              } else if (!quarter.empty()) {
-                status_text = "Q" + quarter;
-              } else if (!game_clock.empty()) {
-                status_text = game_clock;
-              } else {
-                status_text = "In Progress";
-              }
-            }
+            // For at least NFL/Baseball/Hockey/Soccer, game_clock shows the important info.
+            // ("15:00 - 4th", "Top 9th", etc)
+            // If other sports should be more customized, can add them here if (sport == 'XXX') {}
+            status_text = !game_clock.empty() ? game_clock : "In Progress";
           } else if (game_state == "POST") {
             // Post-game: show clock (typically "Final")
             status_text = !game_clock.empty() ? game_clock : "Final";
@@ -291,6 +279,7 @@ lvgl:
             y: 54
             width: 64
             text_align: CENTER
+            long_mode: SCROLL_CIRCULAR
             text: "Game Status"
             styles: ["st_status_text_${uid}"]
 
