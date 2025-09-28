@@ -11,10 +11,6 @@ lvgl_page_manager:
 
 substitutions:
   # MEDIA_PLAYER_ENTITY: media_player.your_media_player
-  ART_CANVAS_WIDTH: "64"
-  ART_CANVAS_HEIGHT: "64"
-  ART_X: "64"
-  ART_Y: "0"
   DEFAULT_ART_SRC: "https://placehold.co/64x64/000/FFF/png"
 
 script:
@@ -452,6 +448,7 @@ lvgl:
             y: 0
             width: 64
             height: 64
+            hidden: ${DISPLAY_W == '64'}
             layout:
               type: flex
               flex_flow: COLUMN
@@ -513,10 +510,10 @@ lvgl:
 
         - canvas:
             id: art_canvas
-            x: ${ART_X}
-            y: ${ART_Y}
-            width: ${ART_CANVAS_WIDTH}
-            height: ${ART_CANVAS_HEIGHT}
+            x: ${DISPLAY_W == '64' and '0' or '64'}
+            y: 0
+            width: 64
+            height: 64
 
       on_load:
         then:
