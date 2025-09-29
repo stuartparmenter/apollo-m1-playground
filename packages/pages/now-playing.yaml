@@ -369,10 +369,9 @@ interval:
           if (id(media_progress_pct_${uid}) != pct) {
             id(media_progress_pct_${uid}) = pct;
             lv_bar_set_value(id(progress_bar_${uid}), pct, LV_ANIM_OFF);
+            ESP_LOGD("now_playing", "dur=%.1f state=%s raw=%.1f anchor=%.1f live=%.1f -> %d%%",
+                     dur, st.c_str(), pos_raw, base_pos, pos_live, pct);
           }
-
-          ESP_LOGD("now_playing", "dur=%.1f state=%s raw=%.1f anchor=%.1f live=%.1f -> %d%%",
-                   dur, st.c_str(), pos_raw, base_pos, pos_live, pct);
 
 lvgl:
   style_definitions:
