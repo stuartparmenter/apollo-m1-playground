@@ -4,23 +4,25 @@
 # =========================
 # Clock + Weather + Home Status (64x64)
 # =========================
+#
+# Required vars:
+#   page_friendly_name: Name of the page (e.g., Clock Dashboard)
+#   weather_entity: Weather entity (e.g., weather.home)
+#   high_entity: High temperature sensor (e.g., sensor.weather_today_high)
+#   low_entity: Low temperature sensor (e.g., sensor.weather_today_low)
+#   alarm_entity: Alarm control panel (e.g., alarm_control_panel.example_alarm)
+#   person_a: Person A entity (e.g., person.person_a)
+#   person_b: Person B entity (e.g., person.person_b)
+#   person_a_icon: Icon for Person A (e.g., "\U000F040A")
+#   person_b_icon: Icon for Person B (e.g., "\U000F0B8F")
 
 lvgl_page_manager:
   pages:
     - page: page_clock_dashboard
-      friendly_name: "Clock Dashboard"
+      friendly_name: "${page_friendly_name}"
 
 substitutions:
   UNITS: "°"
-  # vars.yaml provides:
-  # WX_ENTITY: "weather.home"
-  # HIGH_ENTITY: "sensor.weather_today_high"
-  # LOW_ENTITY:  "sensor.weather_today_low"
-  # ALARM_ENTITY: "alarm_control_panel.example_alarm"
-  # PERSON_A: "person.person_a"
-  # PERSON_B: "person.person_b"
-  # PERSON_A_ICON: "\U000F040A"
-  # PERSON_B_ICON: "\U000F0B8F"
 
 # --- Weather icon fonts (icons only; all text uses Spleen from styles.yaml) ---
 font:
@@ -44,8 +46,8 @@ font:
       "\U000F0CCC",  # shield-lock-outline (armed_away)
       "\U000F0CCB",  # shield-home-outline (armed_home)
       "\U000F099C",  # shield-off-outline (disarmed)
-      "${PERSON_A_ICON}",
-      "${PERSON_B_ICON}",
+      "${person_a_icon}",
+      "${person_b_icon}",
       "\U000F02DC"   # home
     ]
 
@@ -149,7 +151,7 @@ lvgl:
 
         - label:
             id: icon_a
-            text: ${PERSON_A_ICON}
+            text: ${person_a_icon}
             x: 19
             y: 44
             hidden: true
@@ -157,7 +159,7 @@ lvgl:
 
         - label:
             id: icon_b
-            text: ${PERSON_B_ICON}
+            text: ${person_b_icon}
             x: 34
             y: 44
             hidden: true
@@ -207,7 +209,7 @@ sensor:
   # Current temperature
   - platform: homeassistant
     id: wx_temp_now
-    entity_id: ${WX_ENTITY}
+    entity_id: ${weather_entity}
     attribute: temperature
     accuracy_decimals: 0
     on_value:
@@ -222,7 +224,7 @@ sensor:
   # Today's High
   - platform: homeassistant
     id: wx_today_high
-    entity_id: ${HIGH_ENTITY}
+    entity_id: ${high_entity}
     accuracy_decimals: 0
     on_value:
       - lvgl.label.update:
@@ -238,7 +240,7 @@ sensor:
   # Today's Low
   - platform: homeassistant
     id: wx_today_low
-    entity_id: ${LOW_ENTITY}
+    entity_id: ${low_entity}
     accuracy_decimals: 0
     on_value:
       - lvgl.label.update:
@@ -255,7 +257,7 @@ sensor:
 text_sensor:
   - platform: homeassistant
     id: wx_condition
-    entity_id: ${WX_ENTITY}
+    entity_id: ${weather_entity}
     on_value:
       # Set the glyph
       - lvgl.label.update:
@@ -288,7 +290,7 @@ text_sensor:
 
   - platform: homeassistant
     id: alarm_state
-    entity_id: ${ALARM_ENTITY}
+    entity_id: ${alarm_entity}
     on_value:
       - lvgl.label.update:
           id: icon_alarm
@@ -301,7 +303,7 @@ text_sensor:
 
   - platform: homeassistant
     id: person_a
-    entity_id: ${PERSON_A}
+    entity_id: ${person_a}
     on_value:
       - lvgl.label.update:
           id: icon_a
@@ -310,7 +312,7 @@ text_sensor:
 
   - platform: homeassistant
     id: person_b
-    entity_id: ${PERSON_B}
+    entity_id: ${person_b}
     on_value:
       - lvgl.widget.update:
           id: icon_b

@@ -33,71 +33,97 @@ packages:
     ref: main
     refresh: 0s
     files:
-      # Base board/pins, LVGL root, services, etc.
-      - path: packages/controllers/adafruit-matrix-portal-s3.yaml
+    # Base board/pins, LVGL root, services, etc.
+    - path: packages/controllers/adafruit-matrix-portal-s3.yaml
 
-      # Shared helpers, sensors, buttons
-      - path: packages/common/utils.yaml
+    # Shared helpers, sensors, buttons
+    - path: packages/common/utils.yaml
 
-      # Shared fonts and LVGL styles
-      - path: packages/common/theme.yaml
+    # Shared fonts and LVGL styles
+    - path: packages/common/theme.yaml
 
-      # Shared DDP and DDP websocket control config
-      # Note: This is required by "Now Playing" and the "DDP Stream" pages
-      - path: packages/common/ddp.yaml
-        vars:
-          DDP_PORT: "4048"
-          WS_DDP_HOST: "homeassistant.local"
-          WS_DDP_PORT: "8788"
+    # Shared DDP and DDP websocket control config
+    # Note: This is required by "Now Playing" and the "DDP Stream" pages
+    - path: packages/common/ddp.yaml
+      vars:
+        ddp_port: "4048"
+        ws_ddp_host: "homeassistant.local"
+        ws_ddp_port: "8788"
+        device_id: "${name}"
 
-      # WiZ Smart Remote Support
-      - path: packages/common/wizmote.yaml
-        vars:
-          WIZMOTE_PAGE_1: "page_time_date"  # packages/pages/clock.yaml
-          WIZMOTE_PAGE_2: "fx_page"         # packages/pages/fx.yaml
-          WIZMOTE_PAGE_3: "page_pong"       # packages/pages/pong.yaml
-          WIZMOTE_PAGE_4: "ddp_video"       # packages/pages/ddp-stream.yaml
+    # WiZ Smart Remote Support
+    - path: packages/common/wizmote.yaml
+      vars:
+        wizmote_page_1: "page_time_date"  # packages/pages/clock.yaml
+        wizmote_page_2: "fx_page"         # packages/pages/fx.yaml
+        wizmote_page_3: "page_pong"       # packages/pages/pong.yaml
+        wizmote_page_4: "ddp_video"       # packages/pages/ddp-stream.yaml
 
-      # Basic Boot Screen to avoid flashing or things not being ready yet
-      - path: packages/pages/bios.yaml
+    # Basic Boot Screen to avoid flashing or things not being ready yet
+    - path: packages/pages/bios.yaml
 
-      # Simple clock page
-      - path: packages/pages/clock.yaml
+    # Simple clock page
+    - path: packages/pages/clock.yaml
+      vars:
+        page_friendly_name: "Clock"
 
-      # Clock weather / dashboard
-      - path: packages/pages/clock-dashboard.yaml
-        vars:
-          WX_ENTITY: "weather.home"
-          HIGH_ENTITY: "sensor.weather_today_high"
-          LOW_ENTITY:  "sensor.weather_today_low"
-          ALARM_ENTITY: "alarm_control_panel.example_alarm"
-          PERSON_A: "person.person_a"
-          PERSON_B: "person.person_b"
-          PERSON_A_ICON: "\U000F040A"  # account-circle
-          PERSON_B_ICON: "\U000F0B8F"  # account-circle-outline
+    # Clock weather / dashboard
+    - path: packages/pages/clock-dashboard.yaml
+      vars:
+        page_friendly_name: "Clock Dashboard"
+        weather_entity: "weather.home"
+        high_entity: "sensor.weather_today_high"
+        low_entity:  "sensor.weather_today_low"
+        alarm_entity: "alarm_control_panel.example_alarm"
+        person_a: "person.person_a"
+        person_b: "person.person_b"
+        person_a_icon: "\U000F040A"
+        person_b_icon: "\U000F0B8F"
 
-      # "Now Playing" media player page
-      # - path: packages/pages/now-playing.yaml
-      #   vars:
-      #     HA_BASE_URL: "http://homeassistant.local:8123"  # Used to get preview images
-      #     MEDIA_PLAYER_ENTITY: "media_player.your_media_player"
+    # "Now Playing" media player page
+    # - path: packages/pages/now-playing.yaml
+    #   vars:
+    #     uid: "your_uid"
+    #     page_friendly_name: "Now Playing"
+    #     ha_base_url: "http://homeassistant.local:8123"  # Used to get preview images
+    #     media_player_entity: "media_player.your_media_player"
 
-      # Page that uses lvgl-canvas-fx to render various effects (and change which in HA)
-      - path: packages/pages/fx.yaml
+    # Page that uses lvgl-canvas-fx to render various effects (and change which in HA)
+    - path: packages/pages/fx.yaml
+      vars:
+        page_friendly_name: "Visual Effects"
 
-      # A classic
-      - path: packages/pages/pong.yaml
+    # A classic
+    - path: packages/pages/pong.yaml
+      vars:
+        page_friendly_name: "Pong"
 
-      # Visualize your Apollo Automation MSR-2
-      # - path: packages/pages/msr-2-radar.yaml
-      #   vars:
-      #     MSR2_PREFIX: "apollo_msr_2_xxxxxx"
+    # Visualize your Apollo Automation MSR-2
+    # - path: packages/pages/msr-2-radar.yaml
+    #   vars:
+    #     page_friendly_name: "MSR-2 Radar"
+    #     msr2_prefix: "apollo_msr_2_xxxxxx"
 
-      # DDP video streaming
-      - path: packages/pages/ddp-stream.yaml
-        vars:
-          BACK_BUFFERS: 2  # 0-2
-          DEFAULT_VIDEO_SRC: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+    # DDP video streaming
+    - path: packages/pages/ddp-stream.yaml
+      vars:
+        page_friendly_name: "Media Stream"
+        back_buffers: 2  # 0-2
+        default_video_src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+
+    # Team Tracker Page (can be included multiple times with different entities and uids)
+    # - path: packages/pages/teamtracker.yaml
+    #   vars:
+    #     uid: "falcons"
+    #     page_friendly_name: "Team Tracker - Falcons"
+    #     entity_id: "sensor.team_tracker_nfl_atl"
+
+    # QR Code page - YouTube example
+    # - path: packages/pages/qr.yaml
+    #   vars:
+    #     uid: "video"
+    #     page_friendly_name: "QR Code - Cool Video"
+    #     qr_code_text: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
 
 # If you want to support non-horizontal layouts, you can uncomment this section below:

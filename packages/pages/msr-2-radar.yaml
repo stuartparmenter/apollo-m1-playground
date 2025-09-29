@@ -1,20 +1,21 @@
 # © Copyright 2025 Stuart Parmenter
 # SPDX-License-Identifier: MIT
 
-# packages/page-msr2-radar.yaml
-# LVGL radar page for Apollo MSR-2 (64x64 HUB75)
+# MSR-2 Radar
+# Radar page for Apollo MSR-2 (64x64 HUB75)
 # - Target blinks when still; stays solid when moving
 # - Bottom zone LEDs reflect HA zone occupancy
+#
+# Required vars:
+#   page_friendly_name: Name of the page (e.g., MSR-2 Radar)
+#   msr2_prefix: MSR-2 device prefix (e.g., apollo_msr_2_xxxxxx)
 
 lvgl_page_manager:
   pages:
     - page: radar
-      friendly_name: "MSR-2 Radar"
+      friendly_name: "${page_friendly_name}"
 
 substitutions:
-  # vars that need to be passed in to the package:
-  # MSR2_PREFIX: apollo_msr_2_xxxxxx
-
   # ---- Units (set to "1.0" if your distances are already in cm)
   DISTANCE_TO_CM: "2.54"   # inches → cm (set to "1.0" if already cm)
 
@@ -38,29 +39,29 @@ substitutions:
 text_sensor:
   - platform: homeassistant
     id: ts_mov
-    entity_id: sensor.${MSR2_PREFIX}_radar_moving_distance
+    entity_id: sensor.${msr2_prefix}_radar_moving_distance
     internal: true
 
 sensor:
   - platform: homeassistant
     id: s_det
-    entity_id: sensor.${MSR2_PREFIX}_radar_detection_distance
+    entity_id: sensor.${msr2_prefix}_radar_detection_distance
     internal: true
 
   - platform: homeassistant
     id: s_move_e
-    entity_id: sensor.${MSR2_PREFIX}_radar_move_energy
+    entity_id: sensor.${msr2_prefix}_radar_move_energy
     internal: true
 
   - platform: homeassistant
     id: s_still_e
-    entity_id: sensor.${MSR2_PREFIX}_radar_still_energy
+    entity_id: sensor.${msr2_prefix}_radar_still_energy
     internal: true
 
   # End-zone bounds (cm) from HA numbers → update globals
   - platform: homeassistant
     id: s_end1
-    entity_id: number.${MSR2_PREFIX}_radar_end_zone_1
+    entity_id: number.${msr2_prefix}_radar_end_zone_1
     internal: true
     on_value:
       - lambda: |-
@@ -68,7 +69,7 @@ sensor:
 
   - platform: homeassistant
     id: s_end2
-    entity_id: number.${MSR2_PREFIX}_radar_end_zone_2
+    entity_id: number.${msr2_prefix}_radar_end_zone_2
     internal: true
     on_value:
       - lambda: |-
@@ -76,7 +77,7 @@ sensor:
 
   - platform: homeassistant
     id: s_end3
-    entity_id: number.${MSR2_PREFIX}_radar_end_zone_3
+    entity_id: number.${msr2_prefix}_radar_end_zone_3
     internal: true
     on_value:
       - lambda: |-
@@ -85,17 +86,17 @@ sensor:
 binary_sensor:
   - platform: homeassistant
     id: s_z1
-    entity_id: binary_sensor.${MSR2_PREFIX}_radar_zone_1_occupancy
+    entity_id: binary_sensor.${msr2_prefix}_radar_zone_1_occupancy
     internal: true
 
   - platform: homeassistant
     id: s_z2
-    entity_id: binary_sensor.${MSR2_PREFIX}_radar_zone_2_occupancy
+    entity_id: binary_sensor.${msr2_prefix}_radar_zone_2_occupancy
     internal: true
 
   - platform: homeassistant
     id: s_z3
-    entity_id: binary_sensor.${MSR2_PREFIX}_radar_zone_3_occupancy
+    entity_id: binary_sensor.${msr2_prefix}_radar_zone_3_occupancy
     internal: true
 
 # ---------------- STATE ----------------

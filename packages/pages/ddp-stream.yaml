@@ -1,19 +1,20 @@
 # © Copyright 2025 Stuart Parmenter
 # SPDX-License-Identifier: MIT
 
-# =========================================
-# DDP Stream Page (LVGL, ESP-IDF only)
-# Tested with ESPHome 2025.8
-# =========================================
+# DDP Stream Page
+# Video streaming via DDP protocol
+#
+# Required vars:
+#   page_friendly_name: Name of the page (e.g., Video Stream)
+#   back_buffers: Number of back buffers (0-2)
+#   default_video_src: Default video source URL or file path
 
 lvgl_page_manager:
   pages:
     - page: ddp_video
-      friendly_name: "Video (DDP)"
+      friendly_name: "${page_friendly_name}"
 
 substitutions:
-  # vars.yaml provides:
-  # DEFAULT_VIDEO_SRC: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"   # or "mario.gif" or https://... / file:///sd/... etc.
   CANVAS_WIDTH: ${DISPLAY_W}
   CANVAS_HEIGHT: ${DISPLAY_H}
 
@@ -23,7 +24,7 @@ ddp_stream:
   streams:
     - id: stream_video
       canvas: "video_canvas"
-      back_buffers: ${BACK_BUFFERS}  # 0-2
+      back_buffers: ${back_buffers}  # 0-2
 
 # -----------------------------
 # WebSocket control
@@ -33,7 +34,7 @@ ws_ddp_control:
   outputs:
     - id: output_video
       ddp_stream: stream_video
-      src: ${DEFAULT_VIDEO_SRC}
+      src: ${default_video_src}
       # width/height optional; if omitted, auto from canvas
       # width: 64
       # height: 64
@@ -70,9 +71,9 @@ lvgl:
 text:
   - platform: template
     id: video_src_ctl
-    name: "DDP Video Source"
+    name: "Media Source"
     optimistic: true
-    initial_value: ${DEFAULT_VIDEO_SRC}
+    initial_value: ${default_video_src}
     mode: text
     min_length: 4
     max_length: 255

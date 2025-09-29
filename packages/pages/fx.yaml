@@ -1,10 +1,17 @@
 # © Copyright 2025 Stuart Parmenter
 # SPDX-License-Identifier: MIT
 
+# Visual FX Page
+# Interactive visual effects using lvgl-canvas-fx
+# Includes physics simulations and dynamic effects
+#
+# Required vars:
+#   page_friendly_name: Name of the page (e.g., Visual FX)
+
 lvgl_page_manager:
   pages:
     - page: fx_page
-      friendly_name: "Visual FX"
+      friendly_name: "${page_friendly_name}"
 
 external_components:
   - source: github://stuartparmenter/lvgl-canvas-fx@v0.2.0
@@ -16,7 +23,7 @@ external_components:
 select:
   - platform: template
     id: fx_effect_select
-    name: "FX Effect"
+    name: "Effect"
     optimistic: true
     options:
       - circle

@@ -1,10 +1,17 @@
 # © Copyright 2025 Stuart Parmenter
 # SPDX-License-Identifier: MIT
 
+# Audio Spectrum Page
+# Real-time audio spectrum visualization using microphone input
+# Uses lvgl-canvas-fx for dynamic spectrum bars
+#
+# Required vars:
+#   page_friendly_name: Name of the page (e.g., Audio Spectrum)
+
 lvgl_page_manager:
   pages:
     - page: fx_as_page
-      friendly_name: "Audio Spectrum"
+      friendly_name: "${page_friendly_name}"
 
 external_components:
   - source: github://stuartparmenter/lvgl-canvas-fx@v0.2.0

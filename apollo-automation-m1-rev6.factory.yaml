@@ -1,8 +1,3 @@
-external_components:
-  - source: github://pr#10655
-    components: [dashboard_import]
-    refresh: 1h
-
 substitutions:
   name: "apollo-m1-r6"
   friendly_name: "Apollo M-1"
@@ -63,25 +58,37 @@ update:
 
 packages:
   # Base board/pins, LVGL root, services, etc.
-  - !include packages/controllers/apollo-automation-m1-rev6.yaml
+  controller: !include packages/controllers/apollo-automation-m1-rev6.yaml
 
   # Shared helpers, sensors, buttons
-  - !include packages/common/utils.yaml
+  utils: !include packages/common/utils.yaml
 
   # Shared fonts and LVGL styles
-  - !include packages/common/theme.yaml
+  theme: !include packages/common/theme.yaml
 
   # Basic Boot Screen to avoid flashing or things not being ready yet
-  - !include packages/pages/bios.yaml
+  bios: !include packages/pages/bios.yaml
 
   # Simple clock page
-  - !include packages/pages/clock.yaml
+  clock: !include
+    file: packages/pages/clock.yaml
+    vars:
+      page_friendly_name: "Clock"
 
   # Page that uses lvgl-canvas-fx to render various effects (and change which in HA)
-  - !include packages/pages/fx.yaml
+  fx: !include
+    file: packages/pages/fx.yaml
+    vars:
+      page_friendly_name: "Visual Effects"
 
   # Page that uses lvgl-canvas-fx to render audio from the microphone as audio spectrum bars
-  - !include packages/pages/audio-spectrum.yaml
+  audio_spectrum: !include
+    file: packages/pages/audio-spectrum.yaml
+    vars:
+      page_friendly_name: "Audio Spectrum"
 
   # A classic
-  - !include packages/pages/pong.yaml
+  pong: !include
+    file: packages/pages/pong.yaml
+    vars:
+      page_friendly_name: "Pong"

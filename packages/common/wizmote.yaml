@@ -1,17 +1,16 @@
 # © Copyright 2025 Stuart Parmenter
 # SPDX-License-Identifier: MIT
 
-# WizMote remote support using built-in ESPHome ESP-NOW
-# Provides MAC filtering and lvgl_page_manager integration
-# WizMote sends broadcast messages, so all processing happens in on_broadcast
+# WizMote Remote Control
+# Enables WizMote remote support using ESPHome ESP-NOW with MAC filtering and page navigation
+#
+# Required vars:
+#   wizmote_page_1: Page ID for button 1
+#   wizmote_page_2: Page ID for button 2
+#   wizmote_page_3: Page ID for button 3
+#   wizmote_page_4: Page ID for button 4
 
 substitutions:
-  # These need to be passed in:
-  # WIZMOTE_PAGE_1: "page_time_date"
-  # WIZMOTE_PAGE_2: "fx_page"
-  # WIZMOTE_PAGE_3: "page_pong"
-  # WIZMOTE_PAGE_4: "ddp_video"
-
   # WizMote button mappings
   WIZMOTE_BUTTON_ON: "1"
   WIZMOTE_BUTTON_OFF: "2"
@@ -60,25 +59,25 @@ script:
                   lambda: 'return button == 16;'
                 then:
                   - lvgl_page_manager.page.show:
-                      page: ${WIZMOTE_PAGE_1}
+                      page: ${wizmote_page_1}
             - if:
                 condition:
                   lambda: 'return button == 17;'
                 then:
                   - lvgl_page_manager.page.show:
-                      page: ${WIZMOTE_PAGE_2}
+                      page: ${wizmote_page_2}
             - if:
                 condition:
                   lambda: 'return button == 18;'
                 then:
                   - lvgl_page_manager.page.show:
-                      page: ${WIZMOTE_PAGE_3}
+                      page: ${wizmote_page_3}
             - if:
                 condition:
                   lambda: 'return button == 19;'
                 then:
                   - lvgl_page_manager.page.show:
-                      page: ${WIZMOTE_PAGE_4}
+                      page: ${wizmote_page_4}
 
       # Power control buttons
       - if:

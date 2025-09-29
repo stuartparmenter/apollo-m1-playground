@@ -1,19 +1,20 @@
 # © Copyright 2025 Stuart Parmenter
 # SPDX-License-Identifier: MIT
 
-# packages/page-pong.yaml
-# LVGL Pong with human-ish paddles:
+# Pong Game
+# Classic Pong game with human-ish AI paddles
 # - reaction delay, acceleration, speed caps
-# - jitter + small aim bias
-# - panic boost near the paddle
-# - occasional intentional miss
-# - spin based on paddle movement
-# Also: edge scoring, scoreboard (st_spleen8), serve-angle variation.
+# - jitter + small aim bias, panic boost near paddle
+# - occasional intentional miss, spin based on paddle movement
+# - edge scoring, scoreboard, serve-angle variation
+#
+# Required vars:
+#   page_friendly_name: Name of the page (e.g., Pong)
 
 lvgl_page_manager:
   pages:
     - page: page_pong
-      friendly_name: "Pong"
+      friendly_name: "${page_friendly_name}"
 
 substitutions:
   PONG_BORDER: "0"

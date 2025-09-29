@@ -5,9 +5,9 @@
 # Displays a full-screen QR code
 #
 # Required vars:
+#   uid: Unique identifier for this instance (e.g., "github")
 #   page_friendly_name: Name of the page (e.g., "QR Code - GitHub")
 #   qr_code_text: Text/URL to encode in QR code
-#   uid: Unique identifier for this instance (e.g., "github")
 
 lvgl_page_manager:
   pages:

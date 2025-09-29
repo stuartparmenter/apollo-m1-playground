@@ -3,18 +3,23 @@
 
 # Now Playing (LVGL + DDP)
 # This is designed to work with two horizontal panels (128x64)
+#
+# Required vars:
+#   uid: Unique identifier for this instance (e.g., "living_room")
+#   page_friendly_name: Name of the page (e.g., Now Playing - Living Room)
+#   ha_base_url: Home Assistant base URL (e.g., http://homeassistant.local:8123)
+#   media_player_entity: Media player entity ID (e.g., media_player.living_room)
 
 lvgl_page_manager:
   pages:
-    - page: now_playing
-      friendly_name: "Now Playing"
+    - page: page_now_playing_${uid}
+      friendly_name: "${page_friendly_name}"
 
 substitutions:
-  # MEDIA_PLAYER_ENTITY: media_player.your_media_player
   DEFAULT_ART_SRC: "https://placehold.co/64x64/000/FFF/png"
 
 script:
-  - id: np_set_label_text_normalized
+  - id: np_set_label_text_normalized_${uid}
     mode: restart
     parameters:
       widget: lv_obj_t*
@@ -157,7 +162,7 @@ script:
           std::string out = normalize_media_text(text);
           lv_label_set_text((lv_obj_t*)widget, out.c_str());
 
-  - id: np_set_art_src_resolved
+  - id: np_set_art_src_resolved_${uid}
     mode: restart
     parameters:
       path_or_url: string
@@ -174,16 +179,16 @@ script:
             return base + in;
           };
           std::string full = normalize_ha_image_url(path_or_url, base);
-          id(art_src_ctl) = full;
-          id(output_art).set_src(id(art_src_ctl).c_str());
+          id(art_src_ctl_${uid}) = full;
+          id(output_art_${uid}).set_src(id(art_src_ctl_${uid}).c_str());
 
 globals:
-  - id: art_src_ctl
+  - id: art_src_ctl_${uid}
     type: std::string
     restore_value: no
     initial_value: '"${DEFAULT_ART_SRC}"'
   
-  - id: media_progress_pct
+  - id: media_progress_pct_${uid}
     type: int
     restore_value: no
     initial_value: '0'
@@ -192,16 +197,16 @@ globals:
 ddp_stream:
   id: ddp
   streams:
-    - id: stream_art
-      canvas: "art_canvas"
+    - id: stream_art_${uid}
+      canvas: "art_canvas_${uid}"
       back_buffers: 0
 
 # WebSocket control for artwork streaming
 ws_ddp_control:
   id: ws_ddp
   outputs:
-    - id: output_art
-      ddp_stream: stream_art
+    - id: output_art_${uid}
+      ddp_stream: stream_art_${uid}
       src: ${DEFAULT_ART_SRC}
       loop: false
       format: rgb565
@@ -209,76 +214,76 @@ ws_ddp_control:
 # Pull metadata from Home Assistant
 text_sensor:
   - platform: homeassistant
-    id: ha_media_title
-    entity_id: ${MEDIA_PLAYER_ENTITY}
+    id: ha_media_title_${uid}
+    entity_id: ${media_player_entity}
     attribute: media_title
     internal: true
     on_value:
       - script.execute:
-          id: np_set_label_text_normalized
-          widget: !lambda 'return id(title_lbl);'
+          id: np_set_label_text_normalized_${uid}
+          widget: !lambda 'return id(title_lbl_${uid});'
           text: !lambda 'return x.c_str();'
           simplify_unicode: true
 
   - platform: homeassistant
-    id: ha_media_artist
-    entity_id: ${MEDIA_PLAYER_ENTITY}
+    id: ha_media_artist_${uid}
+    entity_id: ${media_player_entity}
     attribute: media_artist
     internal: true
     on_value:
       - script.execute:
-          id: np_set_label_text_normalized
-          widget: !lambda 'return id(artist_lbl);'
+          id: np_set_label_text_normalized_${uid}
+          widget: !lambda 'return id(artist_lbl_${uid});'
           text: !lambda 'return x.c_str();'
           simplify_unicode: true
 
   - platform: homeassistant
-    id: ha_media_album
-    entity_id: ${MEDIA_PLAYER_ENTITY}
+    id: ha_media_album_${uid}
+    entity_id: ${media_player_entity}
     attribute: media_album_name
     internal: true
     on_value:
       - script.execute:
-          id: np_set_label_text_normalized
-          widget: !lambda 'return id(album_lbl);'
+          id: np_set_label_text_normalized_${uid}
+          widget: !lambda 'return id(album_lbl_${uid});'
           text: !lambda 'return x.c_str();'
           simplify_unicode: true
 
   - platform: homeassistant
-    id: ha_entity_picture
-    entity_id: ${MEDIA_PLAYER_ENTITY}
+    id: ha_entity_picture_${uid}
+    entity_id: ${media_player_entity}
     attribute: entity_picture
     internal: true
     on_value:
       - script.execute:
-          id: np_set_art_src_resolved
+          id: np_set_art_src_resolved_${uid}
           path_or_url: !lambda 'return x.c_str();'
-          base: ${HA_BASE_URL}
+          base: ${ha_base_url}
 
   - platform: homeassistant
-    id: ha_media_state
-    entity_id: ${MEDIA_PLAYER_ENTITY}
+    id: ha_media_state_${uid}
+    entity_id: ${media_player_entity}
 
   - platform: homeassistant
-    id: ha_media_pos_updated_at
-    entity_id: ${MEDIA_PLAYER_ENTITY}
+    id: ha_media_pos_updated_at_${uid}
+    entity_id: ${media_player_entity}
     attribute: media_position_updated_at
 
   - platform: homeassistant
-    id: ha_media_content_id
-    entity_id: ${MEDIA_PLAYER_ENTITY}
+    id: ha_media_content_id_${uid}
+    entity_id: ${media_player_entity}
     attribute: media_content_id
 
 sensor:
   - platform: homeassistant
-    id: ha_media_position
-    entity_id: ${MEDIA_PLAYER_ENTITY}
+    id: ha_media_position_${uid}
+    entity_id: ${media_player_entity}
     attribute: media_position
     internal: true
 
   - platform: homeassistant
-    id: ha_media_duration
-    entity_id: ${MEDIA_PLAYER_ENTITY}
+    id: ha_media_duration_${uid}
+    entity_id: ${media_player_entity}
     attribute: media_duration
     internal: true
 
@@ -288,11 +293,11 @@ interval:
   - interval: 1s
     then:
       - lambda: |-
-          const float dur = id(ha_media_duration).state;        // seconds
-          const float pos_raw = id(ha_media_position).state;     // anchor only
-          const auto  st  = id(ha_media_state).state;            // "playing"/"paused"/...
-          const auto  upd = id(ha_media_pos_updated_at).state;   // change marker
-          const auto  cid = id(ha_media_content_id).state;       // track id
+          const float dur = id(ha_media_duration_${uid}).state;        // seconds
+          const float pos_raw = id(ha_media_position_${uid}).state;     // anchor only
+          const auto  st  = id(ha_media_state_${uid}).state;            // "playing"/"paused"/...
+          const auto  upd = id(ha_media_pos_updated_at_${uid}).state;   // change marker
+          const auto  cid = id(ha_media_content_id_${uid}).state;       // track id
           const uint32_t now_ms = millis();
 
           // Sticky anchors
@@ -314,8 +319,8 @@ interval:
             track_changed = true;
             // Reset progress to 0 on track change
             if (!first_run) {
-              id(media_progress_pct) = 0;
-              lv_bar_set_value(id(progress_bar), 0, LV_ANIM_OFF);
+              id(media_progress_pct_${uid}) = 0;
+              lv_bar_set_value(id(progress_bar_${uid}), 0, LV_ANIM_OFF);
               ESP_LOGD("now_playing", "Track changed, resetting progress");
             }
           }
@@ -340,8 +345,8 @@ interval:
           const bool has_track  = is_playing || is_paused;
           if (!has_track || dur <= 0.0f || std::isnan(dur)) {
             // Reset visuals but don't log; idle/standby devices often report 0/NaN duration.
-            id(media_progress_pct) = 0;
-            lv_bar_set_value(id(progress_bar), 0, LV_ANIM_OFF);
+            id(media_progress_pct_${uid}) = 0;
+            lv_bar_set_value(id(progress_bar_${uid}), 0, LV_ANIM_OFF);
             return;
           }
 
@@ -361,9 +366,9 @@ interval:
           if (pct > 100) pct = 100;
 
           // Only update if percentage actually changed to reduce unnecessary updates
-          if (id(media_progress_pct) != pct) {
-            id(media_progress_pct) = pct;
-            lv_bar_set_value(id(progress_bar), pct, LV_ANIM_OFF);
+          if (id(media_progress_pct_${uid}) != pct) {
+            id(media_progress_pct_${uid}) = pct;
+            lv_bar_set_value(id(progress_bar_${uid}), pct, LV_ANIM_OFF);
           }
 
           ESP_LOGD("now_playing", "dur=%.1f state=%s raw=%.1f anchor=%.1f live=%.1f -> %d%%",
@@ -422,12 +427,12 @@ lvgl:
       bg_opa: COVER
 
   pages:
-    - id: now_playing
+    - id: page_now_playing_${uid}
       bg_color: 0x000000
       widgets:
         # On 64x64, this is full screen.  On wider displays it is put as the right panel
         - canvas:
-            id: art_canvas
+            id: art_canvas_${uid}
             x: ${DISPLAY_W == '64' and '0' or '64'}
             y: 0
             width: 64
@@ -435,7 +440,7 @@ lvgl:
 
         # LEFT: 64×64 text column
         - obj:
-            id: left_panel
+            id: left_panel_${uid}
             x: 0
             y: 0
             width: 64
@@ -449,47 +454,47 @@ lvgl:
             styles: [panel_left_box]
             widgets:
               - label:
-                  id: title_lbl
+                  id: title_lbl_${uid}
                   width: 100%
                   long_mode: SCROLL_CIRCULAR
                   text: "[Title]"
                   styles: [st_spleen8, st_title_text]
 
               - obj:
-                  id: div_above_artist
+                  id: div_above_artist_${uid}
                   width: 100%
                   height: 1
                   styles: [st_divider]
 
               - label:
-                  id: artist_lbl
+                  id: artist_lbl_${uid}
                   width: 100%
                   long_mode: SCROLL
                   text: "[Artist]"
                   styles: [st_spleen8, st_artist_text]
 
               - label:
-                  id: album_lbl
+                  id: album_lbl_${uid}
                   width: 100%
                   long_mode: SCROLL
                   text: "[Album]"
                   styles: [st_spleen8, st_album_text]
 
               - obj:
-                  id: spacer_footer
+                  id: spacer_footer_${uid}
                   width: 1
                   height: 1
                   flex_grow: 1
                   styles: [st_spacer_invisible]
 
               - obj:
-                  id: div_above_progress
+                  id: div_above_progress_${uid}
                   width: 100%
                   height: 1
                   styles: [st_divider]
 
               - bar:
-                  id: progress_bar
+                  id: progress_bar_${uid}
                   width: 100%
                   height: 6
                   animated: false
@@ -503,8 +508,8 @@ lvgl:
       on_load:
         then:
           - lambda: |-
-              id(output_art).start();
+              id(output_art_${uid}).start();
           - lambda: |-
-              lv_obj_set_style_anim_speed(id(title_lbl), 7, LV_PART_MAIN);
-              lv_obj_set_style_anim_speed(id(artist_lbl), 12, LV_PART_MAIN);
-              lv_obj_set_style_anim_speed(id(album_lbl), 8, LV_PART_MAIN);
+              lv_obj_set_style_anim_speed(id(title_lbl_${uid}), 7, LV_PART_MAIN);
+              lv_obj_set_style_anim_speed(id(artist_lbl_${uid}), 12, LV_PART_MAIN);
+              lv_obj_set_style_anim_speed(id(album_lbl_${uid}), 8, LV_PART_MAIN);

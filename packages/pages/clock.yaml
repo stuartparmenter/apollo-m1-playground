@@ -1,10 +1,16 @@
 # © Copyright 2025 Stuart Parmenter
 # SPDX-License-Identifier: MIT
 
+# Clock Page
+# Simple time and date display
+#
+# Required vars:
+#   page_friendly_name: Name of the page (e.g., Clock)
+
 lvgl_page_manager:
   pages:
     - page: page_time_date
-      friendly_name: "Clock"
+      friendly_name: "${page_friendly_name}"
 
 # ---- Simple Time + Date page ----
 lvgl:
