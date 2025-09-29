@@ -108,7 +108,7 @@ lvgl:
         # Weather icon (bigger)
         - label:
             id: wx_icon
-            text: ""
+            text: "\U000F0599"
             x: 2
             y: 12
             styles: [style_icon_base]
