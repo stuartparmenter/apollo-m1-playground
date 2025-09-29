@@ -9,17 +9,6 @@ esphome:
   includes:
     - src/page_dice.h
 
-external_components:
-  - source:
-      type: local
-      path: /Builds/esphome_chipmunk2d/esphome/components
-    components: [chipmunk2d]
-
-chipmunk2d:
-  id: phys
-  step_hz: 60
-  gravity: [0, 980]
-
 substitutions:
   DICE_PAGE_ID: dice_canvas_page
   CANVAS_W: "64"

@@ -1,8 +1,8 @@
 // © Copyright 2025 Stuart Parmenter
 // SPDX-License-Identifier: MIT
 
-// src/page_dice.h — D6 toss using shared Chipmunk2D cpSpace (from chipmunk2d component)
-// Renders a 3D-looking die in LVGL, uses Chipmunk for motion + yaw, tiny end-only snap to land flat.
+// src/page_dice.h — D6 toss using pure animation system
+// Renders a 3D-looking die in LVGL, uses deterministic animation for realistic dice roll behavior.
 
 #pragma once
 #include "lvgl.h"
@@ -10,12 +10,6 @@
 #include <stdint.h>
 #include <algorithm>
 #include "esp_system.h"   // esp_random()
-
-// NOTE: Do NOT wrap in extern "C" — Chipmunk provides C++ operator overloads for cpVect.
-#include <chipmunk/chipmunk.h>
-
-// Borrow the cpSpace the component owns/steps.
-extern "C" cpSpace* chipmunk2d_get_space();
 
 #if LV_COLOR_DEPTH != 16
 #error "page_dice.h expects LV_COLOR_DEPTH=16 (RGB565)."
@@ -231,14 +225,14 @@ static float wrap_deg(float a){ while(a<=-180.f) a+=360.f; while(a>180.f) a-=360
 static float nearest90(float a){ return roundf(a/90.0f)*90.0f; }
 static inline float len2(float x,float y){ return sqrtf(x*x+y*y); }
 
-// ---------------- simulation (shared cpSpace) ----------------
+
+// ---------------- animation-based simulation ----------------
 struct Sim{
   lv_obj_t* cv=nullptr; lv_timer_t* tmr=nullptr; int W=0,H=0;
 
-  // Render-space state driven by physics
-  float px=0,py=0;               // center offset in px (Chipmunk world units)
+  // Render-space state driven by animation
+  float px=0,py=0;               // center offset in px
   float ax=0,ay=0,az=0;          // Euler angles (deg)
-  float wz_vis=0;                // visual Z spin (deg/s)
 
   int   top_face=1;
   float size_scale=0.60f;
@@ -247,131 +241,210 @@ struct Sim{
   const float CAM_BASE=0.15f;
   float cam=CAM_BASE; bool cam_transition=false; int cam_ticks=0;
 
-  enum Phase{ Air, Sliding, Settle, Locked } phase=Air;
-  int   settle_ticks=0;
+  enum Phase{ Rolling, Settling, Locked } phase=Locked;
   bool  active=false;
 
-  // ---------- Chipmunk pointers (component owns the space) ----------
-  cpSpace* space=nullptr;        // borrowed (do not free)
-  cpBody*  body=nullptr;         // we own
-  cpShape* box=nullptr;          // we own
-  cpShape* floor=nullptr;        // we own
-  cpShape* leftw=nullptr;        // we own
-  cpShape* rightw=nullptr;       // we own
-  cpShape* roof=nullptr;         // we own
+  // ---------- Animation state ----------
+  float anim_time=0.0f;          // Current animation time (seconds)
+  float anim_duration=2.5f;      // Total animation duration
 
-  float box_size_px=40.0f;
-  float floorY=0.0f, leftX=0.0f, rightX=0.0f, topY=0.0f;
+  // 3D position and velocity
+  float pos_x=0, pos_y=0, pos_z=0;     // 3D position
+  float vel_x=0, vel_y=0, vel_z=0;     // 3D velocity
+  float start_ax=0, start_ay=0, start_az=0;  // Starting angles
+  float target_ax=0, target_ay=0, target_az=0; // Target final angles
+
+  int   bounce_count=0;          // Number of bounces so far
+  float last_bounce_time=0.0f;   // Time of last bounce
+
+  // 3D floor definition - adjusted to match perspective rendering
+  // The visual floor in the perspective view corresponds to this Z level
+  static constexpr float FLOOR_Z = -25.0f;
 
   static uint32_t urand(){ return esp_random(); }
   static float frand(float a,float b){ uint32_t r=urand(); float t=(r&0xFFFFFF)/float(0x1000000); return a+(b-a)*t; }
 
-  float margin() const{
-    float smin=(float)std::min(W,H); float half_base=std::max(10.0f,smin/3.0f);
-    float half=half_base*size_scale; return half*1.25f;
+  // Easing functions for smooth animation
+  static float ease_out_bounce(float t) {
+    if (t < 1.0f / 2.75f) {
+      return 7.5625f * t * t;
+    } else if (t < 2.0f / 2.75f) {
+      t -= 1.5f / 2.75f;
+      return 7.5625f * t * t + 0.75f;
+    } else if (t < 2.5f / 2.75f) {
+      t -= 2.25f / 2.75f;
+      return 7.5625f * t * t + 0.9375f;
+    } else {
+      t -= 2.625f / 2.75f;
+      return 7.5625f * t * t + 0.984375f;
+    }
   }
 
-  void free_ours_(){
-    if(!space) return;
-    if(box){    cpSpaceRemoveShape(space, box);    cpShapeFree(box);    box=nullptr; }
-    if(body){   cpSpaceRemoveBody(space, body);    cpBodyFree(body);    body=nullptr; }
-    if(floor){  cpSpaceRemoveShape(space, floor);  cpShapeFree(floor);  floor=nullptr; }
-    if(leftw){  cpSpaceRemoveShape(space, leftw);  cpShapeFree(leftw);  leftw=nullptr; }
-    if(rightw){ cpSpaceRemoveShape(space, rightw); cpShapeFree(rightw); rightw=nullptr; }
-    if(roof){   cpSpaceRemoveShape(space, roof);   cpShapeFree(roof);   roof=nullptr; }
+  static float ease_out_cubic(float t) {
+    t = 1.0f - t;
+    return 1.0f - t * t * t;
   }
 
-  void build_into_shared_space_(){
-    free_ours_();
-    space = chipmunk2d_get_space();
-    if(!space || W<=0 || H<=0) return;
+  // Calculate target angles for a given face to be on top
+  void calculate_target_angles_for_face(int face, float& target_ax, float& target_ay) {
+    switch(face) {
+      case 1: target_ax = 0;   target_ay = 0;   break;  // +Z (1 pip)
+      case 2: target_ax = 90;  target_ay = 0;   break;  // -Y (2 pips)
+      case 3: target_ax = 0;   target_ay = 90;  break;  // +X (3 pips)
+      case 4: target_ax = 0;   target_ay = -90; break;  // -X (4 pips)
+      case 5: target_ax = -90; target_ay = 0;   break;  // +Y (5 pips)
+      case 6: target_ax = 180; target_ay = 0;   break;  // -Z (6 pips)
+      default: target_ax = 0; target_ay = 0; break;
+    }
+  }
 
-    float m=margin();
-    leftX = -(W*0.5f - m);
-    rightX= +(W*0.5f - m);
-    topY  = -(H*0.5f - m);
-    floorY= +(H*0.5f - m);
+  // 3D vector and cube math
+  struct Vec3 { float x, y, z; };
 
-    cpBody* staticBody = cpSpaceGetStaticBody(space);
+  // Calculate all 8 corners of the cube in 3D space
+  void calculate_cube_corners(float cx, float cy, float cz, float ax_deg, float ay_deg, float az_deg, Vec3 corners[8]) {
+    const float half = 20.0f;  // Half cube size in 3D units
 
-    // tiny edge radius aids stability; moderate elasticity for lively bounces
-    const cpFloat edge_r = 1.5f;
-    floor = cpSegmentShapeNew(staticBody, cpv(-10000, floorY), cpv(10000, floorY), edge_r);
-    leftw = cpSegmentShapeNew(staticBody,  cpv(leftX, -10000), cpv(leftX, 10000), edge_r);
-    rightw= cpSegmentShapeNew(staticBody,  cpv(rightX,-10000), cpv(rightX,10000), edge_r);
-    roof  = cpSegmentShapeNew(staticBody,  cpv(-10000, topY),  cpv(10000, topY),  edge_r);
+    // Create rotation matrices
+    float RX[9], RY[9], RZ[9], Rxy[9], R[9];
+    Rx(ax_deg, RX); Ry(ay_deg, RY); Rz(az_deg, RZ);
+    mat_mul3(RY, RX, Rxy); mat_mul3(RZ, Rxy, R);
 
-    for(auto s: {floor,leftw,rightw,roof}){
-      cpShapeSetFriction(s, 0.70f);
-      cpShapeSetElasticity(s, 0.35f);
-      cpSpaceAddShape(space, s);
+    // 8 corners of a cube centered at origin
+    Vec3 local_corners[8] = {
+      {-half, -half, -half}, {+half, -half, -half}, {+half, +half, -half}, {-half, +half, -half},
+      {-half, -half, +half}, {+half, -half, +half}, {+half, +half, +half}, {-half, +half, +half}
+    };
+
+    // Transform corners by rotation and position
+    for(int i = 0; i < 8; i++) {
+      float lx = local_corners[i].x, ly = local_corners[i].y, lz = local_corners[i].z;
+      corners[i].x = cx + R[0]*lx + R[1]*ly + R[2]*lz;
+      corners[i].y = cy + R[3]*lx + R[4]*ly + R[5]*lz;
+      corners[i].z = cz + R[6]*lx + R[7]*ly + R[8]*lz;
+    }
+  }
+
+  // Find the lowest Z value among all cube corners
+  float get_lowest_corner_z(float cx, float cy, float cz, float ax_deg, float ay_deg, float az_deg) {
+    Vec3 corners[8];
+    calculate_cube_corners(cx, cy, cz, ax_deg, ay_deg, az_deg, corners);
+
+    float min_z = corners[0].z;
+    for(int i = 1; i < 8; i++) {
+      if(corners[i].z < min_z) min_z = corners[i].z;
+    }
+    return min_z;
+  }
+
+  // Check if cube is "flat" on the floor (bottom face parallel to floor)
+  bool is_flat_on_floor(float cx, float cy, float cz, float ax_deg, float ay_deg, float az_deg) {
+    Vec3 corners[8];
+    calculate_cube_corners(cx, cy, cz, ax_deg, ay_deg, az_deg, corners);
+
+    // Find the 4 lowest corners (should form bottom face)
+    float min_z = get_lowest_corner_z(cx, cy, cz, ax_deg, ay_deg, az_deg);
+    const float tolerance = 2.0f;  // Increased tolerance for settling detection
+
+    int low_corners = 0;
+    for(int i = 0; i < 8; i++) {
+      if(fabsf(corners[i].z - min_z) < tolerance) {
+        low_corners++;
+      }
     }
 
-    float Smin=(float)std::min(W,H);
-    float half_base=std::max(10.0f,Smin/3.0f);
-    float half=half_base*size_scale;
-    box_size_px = half*2.0f;
+    // Should have exactly 4 corners at the same lowest level (within tolerance)
+    return (low_corners == 4) && (min_z <= FLOOR_Z + 5.0f);
+  }
 
-    cpFloat mass=1.0f, moment=cpMomentForBox(mass, box_size_px, box_size_px);
-    body = cpBodyNew(mass, moment);
-    box  = cpBoxShapeNew(body, box_size_px, box_size_px, 0);
-    cpShapeSetFriction(box, 0.74f);
-    cpShapeSetElasticity(box, 0.22f);
+  // Check if dice is in a reasonably stable orientation (not balancing on edge/corner)
+  bool is_stable_orientation(float cx, float cy, float cz, float ax_deg, float ay_deg, float az_deg) {
+    Vec3 corners[8];
+    calculate_cube_corners(cx, cy, cz, ax_deg, ay_deg, az_deg, corners);
 
-    cpSpaceAddBody(space, body);
-    cpSpaceAddShape(space, box);
+    // Find corners near the lowest level
+    float min_z = get_lowest_corner_z(cx, cy, cz, ax_deg, ay_deg, az_deg);
+    const float stability_tolerance = 3.0f;
+
+    int low_corners = 0;
+    for(int i = 0; i < 8; i++) {
+      if(fabsf(corners[i].z - min_z) < stability_tolerance) {
+        low_corners++;
+      }
+    }
+
+    bool stable = (low_corners >= 3);
+    ESP_LOGV("DICE", "Stability check: min_z=%.1f, low_corners=%d/8, stable=%d",
+             min_z, low_corners, stable ? 1 : 0);
+
+    // Stable if 3+ corners are near the ground (not balancing on 1-2 corners)
+    return stable;
   }
 
   void begin(lv_obj_t* canvas){
     cv=canvas; ensure_canvas(cv);
     auto img=(lv_img_dsc_t*)lv_canvas_get_img(cv); W=img?img->header.w:0; H=img?img->header.h:0;
-    build_into_shared_space_();
     if(!tmr){ tmr=lv_timer_create([](lv_timer_t* t){ ((Sim*)t->user_data)->tick(); },33,this); } // ~30 Hz
   }
 
   void end(){
     if(tmr){ lv_timer_del(tmr); tmr=nullptr; }
-    free_ours_();                        // only our shapes/bodies
-    space=nullptr;                       // component still owns cpSpace
-    cv=nullptr; active=false; cam_transition=false; phase=Air;
+    cv=nullptr; active=false; cam_transition=false; phase=Locked;
   }
 
   void roll(){
     if(!cv) return;
-    if(!space){ build_into_shared_space_(); if(!space) return; }
 
-    // Choose target top face now (1..6)
-    top_face=(int)frand(1.0f,7.0f); if(top_face<1) top_face=1; if(top_face>6) top_face=6;
+    // Choose target top face (1..6)
+    top_face = (int)frand(1.0f, 7.0f);
+    if(top_face < 1) top_face = 1;
+    if(top_face > 6) top_face = 6;
 
-    // start near center, slightly above floor
-    float x0 = frand(-W*0.15f,  W*0.15f);
-    float y0 = frand(-H*0.18f, -H*0.06f);
+    // Set up animation parameters
+    anim_time = 0.0f;
+    anim_duration = frand(2.0f, 3.0f);
 
-    // decent lateral + downward velocity
-    float vx = frand(-620.0f,  620.0f);
-    float vy = frand(-880.0f,  -380.0f);
-    float ang = frand(0, kPI*2.0f);
-    float angv= frand(-20.0f, 20.0f); // rad/s
+    // 3D starting position - choose coordinates that project to visible area
+    // Target landing should project to center area of screen
+    float target_3d_x = frand(-30.0f, 30.0f);  // Smaller range for better visibility
+    float target_3d_y = frand(-20.0f, 20.0f);
 
-    cpBodySetPosition(body, cpv(x0, y0));
-    cpBodySetVelocity(body,  cpv(vx, vy));
-    cpBodySetAngle(body,     ang);
-    cpBodySetAngularVelocity(body, angv);
+    // Start position offset from target
+    pos_x = target_3d_x + frand(-20.0f, 20.0f);
+    pos_y = target_3d_y + frand(-15.0f, 15.0f);
+    pos_z = 60.0f;  // Start above floor but not too high
 
-    // wake + tiny impulses to avoid “dead” starts and encourage wall ricochets
-    cpBodyActivate(body);
-    cpBodyApplyImpulseAtLocalPoint(body, cpv(vx*0.03f, vy*0.03f), cpv(0,0));
-    cpVect hit = cpv(frand(-box_size_px*0.45f, box_size_px*0.45f),
-                     frand(-box_size_px*0.45f, box_size_px*0.45f));
-    cpBodyApplyImpulseAtLocalPoint(body, cpv(frand(-220.0f,220.0f), frand(-180.0f,180.0f)), hit);
+    // 3D initial velocity toward target area
+    vel_x = (target_3d_x - pos_x) * 0.8f + frand(-15.0f, 15.0f);
+    vel_y = (target_3d_y - pos_y) * 0.8f + frand(-10.0f, 10.0f);
+    vel_z = frand(-40.0f, -15.0f);  // Downward initial velocity
 
-    // visuals (X/Y tumble are decorative; Z follows physics angle)
-    ax=frand(0,360); ay=frand(0,360);
-    az=(float)(ang * 180.0f / kPI);
-    wz_vis=(float)(angv * 180.0f / kPI);
+    // Random starting angles for tumbling
+    start_ax = frand(0, 360);
+    start_ay = frand(0, 360);
+    start_az = frand(0, 360);
 
-    active=true; cam_transition=false; cam=CAM_BASE; cam_ticks=0;
-    settle_ticks=0; phase=Air;
+    // Calculate target angles to show the chosen face (when flat on floor)
+    calculate_target_angles_for_face(top_face, target_ax, target_ay);
+    target_az = frand(-15, 15);
+
+    // Initialize current angles
+    ax = start_ax;
+    ay = start_ay;
+    az = start_az;
+
+    // Update 2D position for rendering (project 3D to 2D using isometric projection)
+    px = (pos_x - pos_y) * 0.65f;
+    py = (pos_x + pos_y) * 0.35f - pos_z * 1.10f;
+
+    // Reset state
+    bounce_count = 0;
+    last_bounce_time = 0.0f;
+    active = true;
+    cam_transition = false;
+    cam = CAM_BASE;
+    cam_ticks = 0;
+    phase = Rolling;
   }
 
   void start_cam_transition(){ cam_transition=true; cam_ticks=0; }
@@ -381,90 +454,203 @@ struct Sim{
     cam_ticks++; if(t>=1.0f) cam_transition=false;
   }
 
-  bool near_floor_() const {
-    cpBB bb = cpShapeCacheBB((cpShape*)box);
-    return (bb.b >= floorY - 0.5f);
-  }
+  void animation_step(){
+    const float dt = 1.0f/30.0f;  // 30 Hz step
+    anim_time += dt;
 
-  // ---- tiny helpers to rely on Chipmunk contact info ----
-  static void _count_arb_cb(cpBody* /*b*/, cpArbiter* /*arb*/, void* data){
-    int* n = (int*)data; (*n)++;
-  }
-  bool touching_any_surface_() const {
-    int n = 0; cpBodyEachArbiter(body, _count_arb_cb, &n); return n > 0;
-  }
-  void snap_body_down_to_floor_() {
-    cpBB bb = cpShapeCacheBB((cpShape*)box);
-    float dy = floorY - bb.b;
-    if (fabsf(dy) > 0.01f) {
-      cpVect p = cpBodyGetPosition(body);
-      cpBodySetPosition(body, cpv(p.x, p.y + dy));
-    }
-  }
+    if(phase == Rolling) {
+      // 3D physics simulation
+      const float gravity = 200.0f;
+      const float damping = 0.98f;
 
-  void physics_step_readback_(){
-    // Space is stepped by the component; just read body state and drive visuals.
-    cpVect p = cpBodyGetPosition(body);
-    cpVect v = cpBodyGetVelocity(body);
-    float ang = (float)cpBodyGetAngle(body);
-    float angv= (float)cpBodyGetAngularVelocity(body);
+      // Apply gravity
+      vel_z -= gravity * dt;
 
-    px = p.x; py = p.y;
-    az = (float)(ang * 180.0f / kPI);
-    wz_vis = (float)(angv * 180.0f / kPI);
+      // Update 3D position
+      pos_x += vel_x * dt;
+      pos_y += vel_y * dt;
+      pos_z += vel_z * dt;
 
-    // a tiny visual tumble on X/Y while moving (decorative)
-    const float dt_frame = 1.0f/30.0f;
-    if(phase==Air || phase==Sliding){
-      float tumble = std::min(1.0f, fabsf(wz_vis)/180.0f);
-      ax += (wz_vis*0.12f) * dt_frame * tumble;
-      ay += (wz_vis*0.08f)  * dt_frame * tumble;
-      ax *= 0.992f; ay *= 0.992f;
-    }
+      // Check for floor collision
+      float lowest_z = get_lowest_corner_z(pos_x, pos_y, pos_z, ax, ay, az);
 
-    float lin = len2(v.x, v.y);
-    float ang_abs = fabsf(wz_vis);
+      if(lowest_z <= FLOOR_Z) {
+        // Collision with floor - bounce
+        bounce_count++;
 
-    // --- phase transitions driven by contact + low velocities ---
-    if(phase==Air){
-      if(touching_any_surface_()) phase=Sliding;
-    }else if(phase==Sliding){
-      if(!touching_any_surface_()) {
-        phase=Air;
-      } else if(lin < 20.0f && ang_abs < 50.0f){
-        phase=Settle; settle_ticks=0;
+        // Adjust Z position so lowest corner touches floor
+        pos_z += (FLOOR_Z - lowest_z);
+
+        // Bounce velocity
+        vel_z = fabsf(vel_z) * 0.6f;  // Reduce bounce energy
+        vel_x *= damping;
+        vel_y *= damping;
+
+        // Add some randomness to bounce
+        vel_x += frand(-10.0f, 10.0f);
+        vel_y += frand(-10.0f, 10.0f);
+
+        // Slow down tumbling after bounces
+        float tumble_reduction = powf(0.7f, bounce_count);
+
+        // Only transition to settling if dice is in a stable orientation
+        bool low_velocity = (fabsf(vel_x) + fabsf(vel_y) + fabsf(vel_z) < 25.0f);
+        bool stable = is_stable_orientation(pos_x, pos_y, pos_z, ax, ay, az);
+        float total_vel = fabsf(vel_x) + fabsf(vel_y) + fabsf(vel_z);
+
+        ESP_LOGI("DICE", "Rolling: bounce=%d, vel=%.1f, stable=%d, pos=(%.1f,%.1f,%.1f)",
+                 bounce_count, total_vel, stable ? 1 : 0, pos_x, pos_y, pos_z);
+
+        if((bounce_count >= 3 && low_velocity && stable) ||
+           (bounce_count >= 5)) {  // Force settling after many bounces
+          ESP_LOGI("DICE", "TRANSITION TO SETTLING: bounce=%d, vel=%.1f, stable=%d",
+                   bounce_count, total_vel, stable ? 1 : 0);
+          phase = Settling;
+          vel_x *= 0.7f;
+          vel_y *= 0.7f;
+          vel_z *= 0.7f;
+        }
       }
-    }else if(phase==Settle){
-      // minimal proportional snap to nearest 90°
-      float tx=nearest90(ax), ty=nearest90(ay);
-      float ex=ax-tx, ey=ay-ty;
-      ax -= 0.22f * ex;
-      ay -= 0.22f * ey;
 
-      settle_ticks++;
-      bool aligned = (fabsf(ex)<1.0f && fabsf(ey)<1.0f);
-      if(aligned && settle_ticks>=6 && touching_any_surface_()){
-        ax=tx; ay=ty;
-        cpBodySetVelocity(body, cpv(0,0));
-        cpBodySetAngularVelocity(body, 0);
-        if(near_floor_()) snap_body_down_to_floor_();
-        phase=Locked; active=false;
+      // Bounds checking - keep dice in reasonable area
+      const float max_3d_range = 40.0f;
+      if(fabsf(pos_x) > max_3d_range || fabsf(pos_y) > max_3d_range) {
+        // Gently pull back toward center
+        vel_x -= pos_x * 0.5f * dt;
+        vel_y -= pos_y * 0.5f * dt;
+      }
+
+      // Tumbling during flight (less chaotic than before)
+      float tumble_speed = 180.0f * powf(0.8f, bounce_count);  // Slower tumbling
+      ax += vel_x * 0.5f * dt;  // Tumbling related to velocity
+      ay += vel_y * 0.5f * dt;
+      az += tumble_speed * dt;
+
+    } else if(phase == Settling) {
+      // Settling phase - smooth transition to flat orientation
+
+      // Heavy damping to stop motion quickly
+      vel_x *= 0.8f;
+      vel_y *= 0.8f;
+      vel_z *= 0.9f;
+
+      // Only apply physics if still moving significantly
+      if(fabsf(vel_x) + fabsf(vel_y) + fabsf(vel_z) > 2.0f) {
+        pos_x += vel_x * dt;
+        pos_y += vel_y * dt;
+        pos_z += vel_z * dt;
+      } else {
+        // Stop physics motion, focus on orientation
+        vel_x = vel_y = vel_z = 0;
+      }
+
+      // Constrain to visible area
+      const float max_3d_range = 25.0f;
+      if(fabsf(pos_x) > max_3d_range) {
+        pos_x = (pos_x > 0) ? max_3d_range : -max_3d_range;
+      }
+      if(fabsf(pos_y) > max_3d_range) {
+        pos_y = (pos_y > 0) ? max_3d_range : -max_3d_range;
+      }
+
+      // Smoothly settle onto floor
+      float lowest_z = get_lowest_corner_z(pos_x, pos_y, pos_z, ax, ay, az);
+      float floor_error = lowest_z - FLOOR_Z;
+
+      if(floor_error < 0) {
+        // Cube is below floor, push up
+        pos_z += (-floor_error);
+      } else if(floor_error > 0.5f) {
+        // Cube is above floor, settle down gently
+        pos_z -= floor_error * 0.3f * dt * 60.0f;  // Gentle settling
+      }
+
+      // Only guide toward target if dice is already reasonably stable
+      bool settling_stable = is_stable_orientation(pos_x, pos_y, pos_z, ax, ay, az);
+      float settle_vel = fabsf(vel_x) + fabsf(vel_y) + fabsf(vel_z);
+
+      if(settling_stable) {
+        // Smooth orientation toward target (no jerky steps)
+        float angle_diff_x = target_ax - ax;
+        float angle_diff_y = target_ay - ay;
+        float angle_diff_z = target_az - az;
+
+        // Handle angle wrapping for shortest path
+        while(angle_diff_x > 180) angle_diff_x -= 360;
+        while(angle_diff_x < -180) angle_diff_x += 360;
+        while(angle_diff_y > 180) angle_diff_y -= 360;
+        while(angle_diff_y < -180) angle_diff_y += 360;
+        while(angle_diff_z > 180) angle_diff_z -= 360;
+        while(angle_diff_z < -180) angle_diff_z += 360;
+
+        float total_angle_diff = fabsf(angle_diff_x) + fabsf(angle_diff_y) + fabsf(angle_diff_z);
+        ESP_LOGI("DICE", "Settling(STABLE): vel=%.1f, angle_diff=%.1f, target=(%d,%d,%d), current=(%.1f,%.1f,%.1f)",
+                 settle_vel, total_angle_diff, (int)target_ax, (int)target_ay, (int)target_az, ax, ay, az);
+
+        // Smooth interpolation (no sudden jumps)
+        const float smooth_rate = 2.0f;  // Slower, more gentle
+        ax += angle_diff_x * smooth_rate * dt;
+        ay += angle_diff_y * smooth_rate * dt;
+        az += angle_diff_z * smooth_rate * dt;
+      } else {
+        ESP_LOGI("DICE", "Settling(UNSTABLE): vel=%.1f, letting physics settle naturally", settle_vel);
+        // If not stable, let physics settle more naturally with minimal tumbling
+        float natural_damping = 0.95f;
+        ax *= natural_damping;
+        ay *= natural_damping;
+        az *= natural_damping;
+      }
+
+      // Check if settled - use proper flat detection
+      bool stopped = (fabsf(vel_x) + fabsf(vel_y) + fabsf(vel_z) < 1.0f);
+
+      // Calculate angle differences for checking
+      float check_angle_diff_x = target_ax - ax;
+      float check_angle_diff_y = target_ay - ay;
+      float check_angle_diff_z = target_az - az;
+      while(check_angle_diff_x > 180) check_angle_diff_x -= 360;
+      while(check_angle_diff_x < -180) check_angle_diff_x += 360;
+      while(check_angle_diff_y > 180) check_angle_diff_y -= 360;
+      while(check_angle_diff_y < -180) check_angle_diff_y += 360;
+      while(check_angle_diff_z > 180) check_angle_diff_z -= 360;
+      while(check_angle_diff_z < -180) check_angle_diff_z += 360;
+
+      bool correct_angles = (fabsf(check_angle_diff_x) + fabsf(check_angle_diff_y) + fabsf(check_angle_diff_z) < 5.0f);
+      bool truly_flat = is_flat_on_floor(pos_x, pos_y, pos_z, ax, ay, az);
+      float final_angle_diff = fabsf(check_angle_diff_x) + fabsf(check_angle_diff_y) + fabsf(check_angle_diff_z);
+
+      ESP_LOGI("DICE", "Final check: stopped=%d, correct_angles=%d(%.1f), truly_flat=%d",
+               stopped ? 1 : 0, correct_angles ? 1 : 0, final_angle_diff, truly_flat ? 1 : 0);
+
+      if(stopped && correct_angles && truly_flat) {
+        ESP_LOGI("DICE", "LOCKING: face=%d, final_pos=(%.1f,%.1f,%.1f), final_angles=(%.1f,%.1f,%.1f)",
+                 top_face, pos_x, pos_y, pos_z, ax, ay, az);
+
+        // Lock in final flat state
+        ax = target_ax;
+        ay = target_ay;
+        az = target_az;
+        vel_x = vel_y = vel_z = 0;
+
+        // Force cube exactly on floor with exact orientation
+        lowest_z = get_lowest_corner_z(pos_x, pos_y, pos_z, ax, ay, az);
+        pos_z += (FLOOR_Z - lowest_z);
+
+        phase = Locked;
+        active = false;
         if(!cam_transition) start_cam_transition();
       }
     }
 
-    // Safety hard stop near the floor
-    if(phase!=Locked){
-      if(lin < 3.0f && ang_abs < 5.0f && near_floor_()){
-        ax=nearest90(ax); ay=nearest90(ay);
-        cpBodySetVelocity(body, cpv(0,0));
-        cpBodySetAngularVelocity(body, 0);
-        snap_body_down_to_floor_();
-        phase=Locked; active=false; cam=1.0f; cam_transition=false;
-      }
-    }
+    // Update 2D rendering position (project 3D to screen using isometric projection)
+    // This matches the projection used in the cube rendering:
+    // X = (x-y)*0.65f + offset, Y = (x+y)*0.35f - z*1.10f + offset
+    px = (pos_x - pos_y) * 0.65f;
+    py = (pos_x + pos_y) * 0.35f - pos_z * 1.10f;
 
-    ax=wrap_deg(ax); ay=wrap_deg(ay); az=wrap_deg(az);
+    ax = wrap_deg(ax);
+    ay = wrap_deg(ay);
+    az = wrap_deg(az);
   }
 
   void render(){
@@ -481,8 +667,7 @@ struct Sim{
   }
 
   void tick(){
-    if(!space){ render(); return; }
-    if(active){ physics_step_readback_(); render(); }
+    if(active){ animation_step(); render(); }
     else if(cam_transition){ step_cam_transition(); render(); }
     else { render(); }
   }
