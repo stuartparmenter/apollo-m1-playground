@@ -174,17 +174,10 @@ script:
             return base + in;
           };
           std::string full = normalize_ha_image_url(path_or_url, base);
-          if (id(last_art_url) == full) return;
           id(art_src_ctl) = full;
           id(output_art).set_src(id(art_src_ctl).c_str());
-          id(last_art_url) = id(art_src_ctl);
 
 globals:
-  - id: last_art_url
-    type: std::string
-    restore_value: no
-    initial_value: '""'
-  
   - id: art_src_ctl
     type: std::string
     restore_value: no
@@ -282,15 +275,6 @@ sensor:
     entity_id: ${MEDIA_PLAYER_ENTITY}
     attribute: media_position
     internal: true
-    on_value:
-      - if:
-          condition:
-            lambda: 'return x < 1.0f && id(ha_entity_picture).has_state();'
-          then:
-            - lambda: |-
-                id(art_src_ctl) = id(ha_entity_picture).state;
-                id(output_art).set_src(id(art_src_ctl).c_str());
-                id(last_art_url) = id(art_src_ctl);
 
   - platform: homeassistant
     id: ha_media_duration
@@ -441,6 +425,14 @@ lvgl:
     - id: now_playing
       bg_color: 0x000000
       widgets:
+        # On 64x64, this is full screen.  On wider displays it is put as the right panel
+        - canvas:
+            id: art_canvas
+            x: ${DISPLAY_W == '64' and '0' or '64'}
+            y: 0
+            width: 64
+            height: 64
+
         # LEFT: 64×64 text column
         - obj:
             id: left_panel
@@ -508,52 +500,10 @@ lvgl:
                     styles: [st_bar_indicator]
                   styles: [st_bar_progress]
 
-        - canvas:
-            id: art_canvas
-            x: ${DISPLAY_W == '64' and '0' or '64'}
-            y: 0
-            width: 64
-            height: 64
-
       on_load:
         then:
           - lambda: |-
               id(output_art).start();
-          - if:
-              condition:
-                lambda: 'return id(ha_media_title).has_state();'
-              then:
-                - script.execute:
-                    id: np_set_label_text_normalized
-                    widget: !lambda 'return id(title_lbl);'
-                    text: !lambda 'return id(ha_media_title).state;'
-                    simplify_unicode: true
-          - if:
-              condition:
-                lambda: 'return id(ha_media_artist).has_state();'
-              then:
-                - script.execute:
-                    id: np_set_label_text_normalized
-                    widget: !lambda 'return id(artist_lbl);'
-                    text: !lambda 'return id(ha_media_artist).state;'
-                    simplify_unicode: true
-          - if:
-              condition:
-                lambda: 'return id(ha_media_album).has_state();'
-              then:
-                - script.execute:
-                    id: np_set_label_text_normalized
-                    widget: !lambda 'return id(album_lbl);'
-                    text: !lambda 'return id(ha_media_album).state;'
-                    simplify_unicode: true
-          - if:
-              condition:
-                lambda: 'return id(ha_entity_picture).has_state();'
-              then:
-                - lambda: |-
-                    id(art_src_ctl) = id(ha_entity_picture).state;
-                    id(output_art).set_src(id(art_src_ctl).c_str());
-                    id(last_art_url) = id(art_src_ctl);
           - lambda: |-
               lv_obj_set_style_anim_speed(id(title_lbl), 7, LV_PART_MAIN);
               lv_obj_set_style_anim_speed(id(artist_lbl), 12, LV_PART_MAIN);
