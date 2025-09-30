@@ -66,6 +66,16 @@ packages:
   # Shared fonts and LVGL styles
   theme: !include packages/common/theme.yaml
 
+  # Shared DDP and DDP websocket control config
+  # Note: This is required by "Now Playing" and the "DDP Stream" pages
+  ddp: !include
+    file: packages/common/ddp.yaml
+    vars:
+      ddp_port: "4048"
+      ws_ddp_host: "homeassistant.local"
+      ws_ddp_port: "8788"
+      device_id: "${name}"
+
   # Basic Boot Screen to avoid flashing or things not being ready yet
   bios: !include packages/pages/bios.yaml
 
@@ -92,3 +102,11 @@ packages:
     file: packages/pages/pong.yaml
     vars:
       page_friendly_name: "Pong"
+
+  # DDP video streaming
+  ddp_stream: !include
+    file: packages/pages/ddp-stream.yaml
+    vars:
+      page_friendly_name: "Media Stream"
+      back_buffers: 2  # 0-2
+      default_video_src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
