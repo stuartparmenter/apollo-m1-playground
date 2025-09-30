@@ -1,0 +1,178 @@
+# © Copyright 2025 Stuart Parmenter
+# SPDX-License-Identifier: MIT
+
+# Timer
+# Displays a countdown timer that updates every second
+#
+# Required vars:
+#   uid: Unique identifier for this instance (e.g., "test_timer")
+#   page_friendly_name: Name of the page (e.g., "Timer")
+#   entity_id: Home Assistant timer entity (e.g., timer.test)
+
+lvgl_page_manager:
+  pages:
+    - page: page_timer${uid}
+      friendly_name: "Timer"
+
+# Fetch timer state from Home Assistant
+text_sensor:
+  - platform: homeassistant
+    id: timer_state${uid}
+    entity_id: ${entity_id}
+    internal: true
+
+  - platform: homeassistant
+    id: timer_finishes_at${uid}
+    entity_id: ${entity_id}
+    attribute: finishes_at
+    internal: true
+
+  - platform: homeassistant
+    id: timer_remaining${uid}
+    entity_id: ${entity_id}
+    attribute: remaining
+    internal: true
+
+  - platform: homeassistant
+    id: timer_duration${uid}
+    entity_id: ${entity_id}
+    attribute: duration
+    internal: true
+
+globals:
+  - id: timer_last_state${uid}
+    type: std::string
+    restore_value: no
+    initial_value: '""'
+
+lvgl:
+  pages:
+    - id: page_timer${uid}
+      width: 100%
+      height: 100%
+      on_load:
+        - lambda: |-
+            // Reset state tracking when page loads
+            id(timer_last_state${uid}) = "";
+      layout:
+        type: FLEX
+        flex_flow: COLUMN
+        flex_align_main: CENTER
+        flex_align_cross: CENTER
+        pad_row: 6
+      widgets:
+        - label:
+            id: timer_label${uid}
+            width: 100%
+            text_align: CENTER
+            styles: [st_spleen16]
+            text: "00:00"
+
+time:
+  - id: !extend ha_time
+    on_time:
+      - seconds: '*'
+        then:
+          - lambda: |-
+              // Helper function to strip leading zeros from time strings
+              auto strip_leading_zeros = [](const std::string& time_str) -> std::string {
+                std::string result = time_str;
+                // Strip leading "0:" if present (e.g., "0:05:00" -> "05:00" or "0:00:05" -> "00:05")
+                if (result.length() > 2 && result[0] == '0' && result[1] == ':') {
+                  result = result.substr(2);
+                  // Strip leading "0" from minutes if present (e.g., "05:00" -> "5:00")
+                  if (result.length() > 0 && result[0] == '0') {
+                    result = result.substr(1);
+                  }
+                }
+                return result;
+              };
+
+              auto last_state = id(timer_last_state${uid});
+              auto state = id(timer_state${uid}).state;
+
+              // If idle, show duration or 0:00 if just finished
+              if (state == "idle") {
+                if (last_state != "idle") {
+                  // If we just transitioned from active, timer finished - show 0:00
+                  if (last_state == "active") {
+                    lv_label_set_text(id(timer_label${uid}), "0:00");
+                  } else {
+                    // Otherwise show the configured duration
+                    auto duration = id(timer_duration${uid}).state;
+                    std::string display_text = strip_leading_zeros(duration);
+                    lv_label_set_text(id(timer_label${uid}), display_text.c_str());
+                  }
+                  id(timer_last_state${uid}) = "idle";
+                }
+                return;
+              }
+
+              // If paused, use the remaining attribute once and stop updating
+              if (state == "paused") {
+                if (last_state != "paused") {
+                  auto remaining = id(timer_remaining${uid}).state;
+                  std::string display_text = strip_leading_zeros(remaining);
+                  lv_label_set_text(id(timer_label${uid}), display_text.c_str());
+                  id(timer_last_state${uid}) = "paused";
+                }
+                return;
+              }
+
+              id(timer_last_state${uid}) = "active";
+
+              // If active, calculate from finishes_at
+              if (state == "active") {
+                auto finishes_at_str = id(timer_finishes_at${uid}).state;
+                if (finishes_at_str.empty()) {
+                  return;
+                }
+
+                // Parse the ISO timestamp: "2025-09-30T00:06:16+00:00"
+                struct tm tm;
+                memset(&tm, 0, sizeof(tm));
+
+                // Strip the timezone suffix for parsing (ESP32 strptime doesn't support %z)
+                std::string time_str = finishes_at_str;
+                size_t tz_pos = time_str.find_last_of("+-");
+                if (tz_pos != std::string::npos && tz_pos > 10) {
+                  time_str = time_str.substr(0, tz_pos);
+                }
+
+                // Use strptime to parse ISO8601 format
+                char* result = strptime(time_str.c_str(), "%Y-%m-%dT%H:%M:%S", &tm);
+
+                if (result == nullptr) {
+                  lv_label_set_text(id(timer_label${uid}), "--:--");
+                  ESP_LOGD("timer", "strptime failed for: %s", time_str.c_str());
+                  return;
+                }
+
+                time_t now = id(ha_time).now().timestamp;
+
+                // Get current time in UTC to calculate seconds until finish
+                struct tm utc_now;
+                gmtime_r(&now, &utc_now);
+
+                // Calculate seconds for both times (within the year, accounting for day/hour/min/sec)
+                int finish_seconds = (tm.tm_mon * 31 + tm.tm_mday) * 86400 +
+                                     tm.tm_hour * 3600 + tm.tm_min * 60 + tm.tm_sec;
+                int now_seconds = (utc_now.tm_mon * 31 + utc_now.tm_mday) * 86400 +
+                                  utc_now.tm_hour * 3600 + utc_now.tm_min * 60 + utc_now.tm_sec;
+
+                int remaining_seconds = finish_seconds - now_seconds;
+                if (remaining_seconds < 0) remaining_seconds = 0;
+
+                int hours = remaining_seconds / 3600;
+                int minutes = (remaining_seconds % 3600) / 60;
+                int seconds = remaining_seconds % 60;
+
+                char buffer[20];
+                if (hours > 0) {
+                  snprintf(buffer, sizeof(buffer), "%d:%02d:%02d", hours, minutes, seconds);
+                } else {
+                  snprintf(buffer, sizeof(buffer), "%d:%02d", minutes, seconds);
+                }
+
+                lv_label_set_text(id(timer_label${uid}), buffer);
+              }
