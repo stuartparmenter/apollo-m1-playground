@@ -11,7 +11,7 @@
 #   device_id: Device ID for WebSocket identification
 
 external_components:
-  - source: github://stuartparmenter/lvgl-ddp-stream@v0.5.0
+  - source: github://stuartparmenter/lvgl-ddp-stream@v0.5.1
     components: [ddp_stream, ws_ddp_control]
 
 # DDP Canvas Binding
