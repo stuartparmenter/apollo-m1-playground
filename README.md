@@ -137,7 +137,6 @@ View pairing status via the "WizMote Status" entity in Home Assistant.
 - **HUB75 Display Driver**: [`stuartparmenter/ESPHome-HUB75-MatrixDisplayWrapper`](https://github.com/stuartparmenter/ESPHome-HUB75-MatrixDisplayWrapper)
 - **DDP Stream + WebSocket Control**: [`stuartparmenter/lvgl-ddp-stream`](https://github.com/stuartparmenter/lvgl-ddp-stream)
 - **LVGL Canvas Effects**: [`stuartparmenter/lvgl-canvas-fx`](https://github.com/stuartparmenter/lvgl-canvas-fx)
-- **Physics Engine**: [`stuartparmenter/chipmunk2d-esphome`](https://github.com/stuartparmenter/chipmunk2d-esphome)
 - **Page Manager**: [`stuartparmenter/lvgl-page-manager`](https://github.com/stuartparmenter/lvgl-page-manager)
 
 > For reproducible builds, prefer **tags** or **commit SHAs** rather than a moving branch.
