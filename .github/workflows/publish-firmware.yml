@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         file: [apollo-automation-m1-rev4, apollo-automation-m1-rev6, adafruit-matrix-portal-s3]
-    uses: esphome/workflows/.github/workflows/build.yml@2025.8.1
+    uses: esphome/workflows/.github/workflows/build.yml@2025.10.0
     with:
       #### Modify below here to match your project ####
       files: ${{ matrix.file }}.factory.yaml
@@ -28,7 +28,7 @@ jobs:
 
   upload-to-release:
     name: Upload to Release
-    uses: esphome/workflows/.github/workflows/upload-to-gh-release.yml@2025.8.1
+    uses: esphome/workflows/.github/workflows/upload-to-gh-release.yml@2025.10.0
     needs:
       - build-firmware
     with:
