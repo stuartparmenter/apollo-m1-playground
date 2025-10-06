@@ -1,0 +1,39 @@
+# © Copyright 2025 Stuart Parmenter
+# SPDX-License-Identifier: MIT
+
+# DDP Stream Page
+# Straight DDP renderer page that uses stream id 1 (device default)
+#
+# Required vars:
+#   page_friendly_name: Name of the page (e.g., DDP Receiver)
+#   back_buffers: Number of back buffers (0-2)
+
+lvgl_page_manager:
+  pages:
+    - page: ddp_receiver
+      friendly_name: "${page_friendly_name}"
+
+substitutions:
+  CANVAS_WIDTH: ${DISPLAY_W}
+  CANVAS_HEIGHT: ${DISPLAY_H}
+
+# UDP DDP sink + canvas bindings (no w/h required here)
+ddp_stream:
+  id: ddp_test
+  streams:
+    - id: stream_video_test
+      canvas: "ddp_receiver_canvas"
+      back_buffers: ${back_buffers}  # 0-2
+      stream: 1
+
+# -----------------------------
+# LVGL page with a single canvas
+# -----------------------------
+lvgl:
+  pages:
+    - id: ddp_receiver
+      widgets:
+        - canvas:
+            id: ddp_receiver_canvas
+            width: ${CANVAS_WIDTH}
+            height: ${CANVAS_HEIGHT}
