@@ -16,7 +16,7 @@ lvgl_page_manager:
       friendly_name: "${page_friendly_name}"
 
 substitutions:
-  DEFAULT_ART_SRC: "https://placehold.co/64x64/000/FFF/png"
+  DEFAULT_ART_SRC: "internal:placeholder/64x64/000000.png"
 
 script:
   - id: np_set_label_text_normalized_${uid}
