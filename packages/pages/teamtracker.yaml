@@ -32,6 +32,9 @@ ddp_stream:
     - id: stream_home_${uid}
       canvas: "home_logo_canvas_${uid}"
       back_buffers: 0
+    - id: stream_league_${uid}
+      canvas: "league_logo_canvas_${uid}"
+      back_buffers: 0
 
 # WebSocket control for logo streaming
 ws_ddp_control:
@@ -47,8 +50,29 @@ ws_ddp_control:
       src: ""
       loop: false
       format: rgb565
+    - id: output_league_${uid}
+      ddp_stream: stream_league_${uid}
+      src: ""
+      loop: false
+      format: rgb565
 
 script:
+  - id: update_page_visibility_${uid}
+    mode: restart
+    then:
+      - lambda: |-
+          std::string game_state = id(ha_teamtracker_entity_${uid}).has_state() ? id(ha_teamtracker_entity_${uid}).state : "";
+
+          if (game_state == "NOT_FOUND") {
+            // No game scheduled - show "no game" container, hide game container
+            lv_obj_add_flag(id(game_container_${uid}), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(no_game_container_${uid}), LV_OBJ_FLAG_HIDDEN);
+          } else {
+            // Game exists - show game container, hide "no game" container
+            lv_obj_clear_flag(id(game_container_${uid}), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(id(no_game_container_${uid}), LV_OBJ_FLAG_HIDDEN);
+          }
+
   - id: update_game_status_${uid}
     mode: restart
     then:
@@ -89,6 +113,14 @@ text_sensor:
       - lvgl.label.update:
           id: away_team_lbl_${uid}
           text: !lambda 'return x.c_str();'
+      - lvgl.label.update:
+          id: no_game_team_lbl_${uid}
+          text: !lambda |-
+            std::string league = id(ha_league_${uid}).has_state() ? id(ha_league_${uid}).state : "";
+            if (x == "*") {
+              return league.c_str();  // Show league name when team_abbr is "*"
+            }
+            return x.c_str();
 
   - platform: homeassistant
     id: ha_team_logo_${uid}
@@ -96,9 +128,13 @@ text_sensor:
     attribute: team_logo
     internal: true
     on_value:
-      - ws_ddp_control.set_src:
-          id: output_away_${uid}
-          src: !lambda "return x;"
+      - if:
+          condition:
+            lambda: 'return !x.empty() && x != "None";'
+          then:
+            - ws_ddp_control.set_src:
+                id: output_away_${uid}
+                src: !lambda "return x;"
 
   - platform: homeassistant
     id: ha_team_score_${uid}
@@ -132,9 +168,13 @@ text_sensor:
     attribute: opponent_logo
     internal: true
     on_value:
-      - ws_ddp_control.set_src:
-          id: output_home_${uid}
-          src: !lambda "return x;"
+      - if:
+          condition:
+            lambda: 'return !x.empty() && x != "None";'
+          then:
+            - ws_ddp_control.set_src:
+                id: output_home_${uid}
+                src: !lambda "return x;"
 
   - platform: homeassistant
     id: ha_opponent_score_${uid}
@@ -157,6 +197,35 @@ text_sensor:
     entity_id: ${entity_id}
     attribute: sport
     internal: true
+
+  - platform: homeassistant
+    id: ha_league_${uid}
+    entity_id: ${entity_id}
+    attribute: league
+    internal: true
+    on_value:
+      - lvgl.label.update:
+          id: no_game_team_lbl_${uid}
+          text: !lambda |-
+            std::string team_abbr = id(ha_team_abbr_${uid}).has_state() ? id(ha_team_abbr_${uid}).state : "";
+            if (team_abbr == "*") {
+              return x.c_str();  // Show league name when team_abbr is "*"
+            }
+            return team_abbr.c_str();
+
+  - platform: homeassistant
+    id: ha_league_logo_${uid}
+    entity_id: ${entity_id}
+    attribute: league_logo
+    internal: true
+    on_value:
+      - if:
+          condition:
+            lambda: 'return !x.empty() && x != "None";'
+          then:
+            - ws_ddp_control.set_src:
+                id: output_league_${uid}
+                src: !lambda "return x;"
 
   - platform: homeassistant
     id: ha_kickoff_in_${uid}
@@ -184,6 +253,8 @@ text_sensor:
     entity_id: ${entity_id}
     internal: true
     on_value:
+      - script.execute:
+          id: update_page_visibility_${uid}
       - script.execute:
           id: update_game_status_${uid}
 
@@ -218,73 +289,118 @@ lvgl:
     - id: teamtracker_${uid}
       bg_color: 0x000000
       widgets:
-        # Away team logo (left)
-        - canvas:
-            id: away_logo_canvas_${uid}
-            x: ${AWAY_LOGO_X}
-            y: ${TEAM_LOGO_Y}
-            width: ${TEAM_LOGO_SIZE}
-            height: ${TEAM_LOGO_SIZE}
-
-        # Home team logo (right)
-        - canvas:
-            id: home_logo_canvas_${uid}
-            x: ${HOME_LOGO_X}
-            y: ${TEAM_LOGO_Y}
-            width: ${TEAM_LOGO_SIZE}
-            height: ${TEAM_LOGO_SIZE}
-
-        # Away team name and score (left side)
-        - label:
-            id: away_team_lbl_${uid}
+        # Container for normal game display
+        - obj:
+            id: game_container_${uid}
             x: 0
-            y: 34
-            width: 32
-            text_align: CENTER
-            text: "AWAY"
-            styles: ["st_team_text_${uid}"]
-
-        - label:
-            id: away_score_lbl_${uid}
-            x: 0
-            y: 44
-            width: 32
-            text_align: CENTER
-            text: "0"
-            styles: ["st_score_text_${uid}"]
-
-        # Home team name and score (right side)
-        - label:
-            id: home_team_lbl_${uid}
-            x: 32
-            y: 34
-            width: 32
-            text_align: CENTER
-            text: "HOME"
-            styles: ["st_team_text_${uid}"]
-
-        - label:
-            id: home_score_lbl_${uid}
-            x: 32
-            y: 44
-            width: 32
-            text_align: CENTER
-            text: "0"
-            styles: ["st_score_text_${uid}"]
-
-        # Game status (bottom)
-        - label:
-            id: game_status_lbl_${uid}
-            x: 0
-            y: 54
+            y: 0
             width: 64
-            text_align: CENTER
-            long_mode: SCROLL_CIRCULAR
-            text: "Game Status"
-            styles: ["st_status_text_${uid}"]
+            height: 64
+            widgets:
+              # Away team logo (left)
+              - canvas:
+                  id: away_logo_canvas_${uid}
+                  x: ${AWAY_LOGO_X}
+                  y: ${TEAM_LOGO_Y}
+                  width: ${TEAM_LOGO_SIZE}
+                  height: ${TEAM_LOGO_SIZE}
+
+              # Home team logo (right)
+              - canvas:
+                  id: home_logo_canvas_${uid}
+                  x: ${HOME_LOGO_X}
+                  y: ${TEAM_LOGO_Y}
+                  width: ${TEAM_LOGO_SIZE}
+                  height: ${TEAM_LOGO_SIZE}
+
+              # Away team name and score (left side)
+              - label:
+                  id: away_team_lbl_${uid}
+                  x: 0
+                  y: 34
+                  width: 32
+                  text_align: CENTER
+                  text: "AWAY"
+                  styles: ["st_team_text_${uid}"]
+
+              - label:
+                  id: away_score_lbl_${uid}
+                  x: 0
+                  y: 44
+                  width: 32
+                  text_align: CENTER
+                  text: "0"
+                  styles: ["st_score_text_${uid}"]
+
+              # Home team name and score (right side)
+              - label:
+                  id: home_team_lbl_${uid}
+                  x: 32
+                  y: 34
+                  width: 32
+                  text_align: CENTER
+                  text: "HOME"
+                  styles: ["st_team_text_${uid}"]
+
+              - label:
+                  id: home_score_lbl_${uid}
+                  x: 32
+                  y: 44
+                  width: 32
+                  text_align: CENTER
+                  text: "0"
+                  styles: ["st_score_text_${uid}"]
+
+              # Game status (bottom)
+              - label:
+                  id: game_status_lbl_${uid}
+                  x: 0
+                  y: 54
+                  width: 64
+                  text_align: CENTER
+                  long_mode: SCROLL_CIRCULAR
+                  text: "Game Status"
+                  styles: ["st_status_text_${uid}"]
+
+        # Container for "no game" display
+        - obj:
+            id: no_game_container_${uid}
+            x: 0
+            y: 0
+            width: 64
+            height: 64
+            hidden: true
+            widgets:
+              # League logo (22x22 at top center)
+              - canvas:
+                  id: league_logo_canvas_${uid}
+                  x: 21
+                  y: 2
+                  width: 22
+                  height: 22
+
+              # Team abbr or league name
+              - label:
+                  id: no_game_team_lbl_${uid}
+                  x: 0
+                  y: 28
+                  width: 64
+                  text_align: CENTER
+                  text: "???"
+
+              # "Nothing Upcoming" message
+              - label:
+                  id: no_game_msg_lbl_${uid}
+                  x: 0
+                  y: 42
+                  width: 64
+                  text_align: CENTER
+                  long_mode: WRAP
+                  text: "Nothing Upcoming"
 
       on_load:
         then:
           - lambda: |-
               id(output_away_${uid}).start();
               id(output_home_${uid}).start();
+              id(output_league_${uid}).start();
