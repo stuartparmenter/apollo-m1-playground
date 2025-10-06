@@ -40,3 +40,14 @@ lvgl:
   # Global defaults for *all* widgets
   bg_color: black
   text_color: white
+
+  # Widget-specific theme defaults
+  # Note: obj widgets have default styling (padding, borders, rounded corners, backgrounds)
+  # that we don't want for our minimal display aesthetic, so we disable it here
+  theme:
+    obj:
+      pad_all: 0
+      border_width: 0
+      radius: 0
+      bg_opa: TRANSP
+      text_color: white
