@@ -180,6 +180,7 @@ lvgl:
             width: ${PONG_PADDLE_W}
             height: ${PONG_PADDLE_H}
             bg_color: ${PONG_FG}
+            bg_opa: COVER
             border_width: ${PONG_BORDER}
 
         - obj:
@@ -189,6 +190,7 @@ lvgl:
             width: ${PONG_PADDLE_W}
             height: ${PONG_PADDLE_H}
             bg_color: ${PONG_FG}
+            bg_opa: COVER
             border_width: ${PONG_BORDER}
 
         - obj:
@@ -199,6 +201,7 @@ lvgl:
             height: ${PONG_BALL_H}
             radius: 2
             bg_color: ${PONG_FG}
+            bg_opa: COVER
             border_width: ${PONG_BORDER}
 
 script:
