@@ -25,6 +25,9 @@ ddp_stream:
       canvas: "ddp_receiver_canvas"
       back_buffers: ${back_buffers}  # 0-2
       stream: 1
+      receiving:
+        name: "DDP Stream 1"
+        device_class: connectivity
 
 # -----------------------------
 # LVGL page with a single canvas
