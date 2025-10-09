@@ -101,11 +101,11 @@ script:
                 float current = id(brightness).state;
                 float step_percent = ${WIZMOTE_BRIGHTNESS_STEP} / 100.0f;
                 float min_step = ${WIZMOTE_BRIGHTNESS_MIN_STEP};
-                float new_brightness = std::min(255.0f, current + std::max(min_step, 255.0f * step_percent));
+                int new_brightness = static_cast<int>(std::min(255.0f, current + std::max(min_step, 255.0f * step_percent)));
                 auto call = id(brightness).make_call();
                 call.set_value(new_brightness);
                 call.perform();
-                ESP_LOGI("wizmote", "Brightness increased: %.0f -> %.0f", current, new_brightness);
+                ESP_LOGI("wizmote", "Brightness increased: %.0f -> %d", current, new_brightness);
 
       - if:
           condition:
@@ -115,11 +115,11 @@ script:
                 float current = id(brightness).state;
                 float step_percent = ${WIZMOTE_BRIGHTNESS_STEP} / 100.0f;
                 float min_step = ${WIZMOTE_BRIGHTNESS_MIN_STEP};
-                float new_brightness = std::max(1.0f, current - std::max(min_step, 255.0f * step_percent));
+                int new_brightness = static_cast<int>(std::max(1.0f, current - std::max(min_step, 255.0f * step_percent)));
                 auto call = id(brightness).make_call();
                 call.set_value(new_brightness);
                 call.perform();
-                ESP_LOGI("wizmote", "Brightness decreased: %.0f -> %.0f", current, new_brightness);
+                ESP_LOGI("wizmote", "Brightness decreased: %.0f -> %d", current, new_brightness);
 
       - if:
           condition:
