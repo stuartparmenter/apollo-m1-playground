@@ -13,18 +13,16 @@ lvgl_page_manager:
     - page: ddp_receiver
       friendly_name: "${page_friendly_name}"
 
-substitutions:
-  CANVAS_WIDTH: ${DISPLAY_W}
-  CANVAS_HEIGHT: ${DISPLAY_H}
-
 # UDP DDP sink + canvas bindings (no w/h required here)
 ddp_stream:
   id: ddp_test
   streams:
-    - id: stream_video_test
+    - id: ddp_receiver_stream
+      stream: 1
       canvas: "ddp_receiver_canvas"
       back_buffers: ${back_buffers}  # 0-2
-      stream: 1
+      width: ${DISPLAY_W}
+      height: ${DISPLAY_H}
       receiving:
         name: "DDP Stream 1"
         device_class: connectivity
@@ -38,5 +36,5 @@ lvgl:
       widgets:
         - canvas:
             id: ddp_receiver_canvas
-            width: ${CANVAS_WIDTH}
-            height: ${CANVAS_HEIGHT}
+            width: ${DISPLAY_W}
+            height: ${DISPLAY_H}
