@@ -23,35 +23,33 @@ substitutions:
 
 
 # DDP sink + canvas binding for team logos
-ddp_stream:
-  id: ddp
-  streams:
-    - id: stream_away_${uid}
-      canvas: "away_logo_canvas_${uid}"
-      back_buffers: 0
-    - id: stream_home_${uid}
-      canvas: "home_logo_canvas_${uid}"
-      back_buffers: 0
-    - id: stream_league_${uid}
-      canvas: "league_logo_canvas_${uid}"
-      back_buffers: 0
+ddp_canvas:
+  - id: stream_away_${uid}
+    canvas: away_logo_canvas_${uid}
+    back_buffers: 0
+  - id: stream_home_${uid}
+    canvas: home_logo_canvas_${uid}
+    back_buffers: 0
+  - id: stream_league_${uid}
+    canvas: league_logo_canvas_${uid}
+    back_buffers: 0
 
 # WebSocket control for logo streaming
-ws_ddp_control:
-  id: ws_ddp
+media_proxy_control:
+  id: mp_control
   outputs:
     - id: output_away_${uid}
-      ddp_stream: stream_away_${uid}
+      stream: stream_away_${uid}
       src: ""
       loop: false
       format: rgb565
     - id: output_home_${uid}
-      ddp_stream: stream_home_${uid}
+      stream: stream_home_${uid}
       src: ""
       loop: false
       format: rgb565
     - id: output_league_${uid}
-      ddp_stream: stream_league_${uid}
+      stream: stream_league_${uid}
       src: ""
       loop: false
       format: rgb565
@@ -132,7 +130,7 @@ text_sensor:
           condition:
             lambda: 'return !x.empty() && x != "None";'
           then:
-            - ws_ddp_control.set_src:
+            - media_proxy_control.set_source:
                 id: output_away_${uid}
                 src: !lambda "return x;"
 
@@ -172,7 +170,7 @@ text_sensor:
           condition:
             lambda: 'return !x.empty() && x != "None";'
           then:
-            - ws_ddp_control.set_src:
+            - media_proxy_control.set_source:
                 id: output_home_${uid}
                 src: !lambda "return x;"
 
@@ -223,7 +221,7 @@ text_sensor:
           condition:
             lambda: 'return !x.empty() && x != "None";'
           then:
-            - ws_ddp_control.set_src:
+            - media_proxy_control.set_source:
                 id: output_league_${uid}
                 src: !lambda "return x;"
 

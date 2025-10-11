@@ -14,18 +14,16 @@ lvgl_page_manager:
       friendly_name: "${page_friendly_name}"
 
 # UDP DDP sink + canvas bindings (no w/h required here)
-ddp_stream:
-  id: ddp_test
-  streams:
-    - id: ddp_receiver_stream
-      stream: 1
-      canvas: "ddp_receiver_canvas"
-      back_buffers: ${back_buffers}  # 0-2
-      width: ${DISPLAY_W}
-      height: ${DISPLAY_H}
-      receiving:
-        name: "DDP Stream 1"
-        device_class: connectivity
+ddp_canvas:
+  - id: ddp_receiver_stream
+    stream: 1
+    canvas: ddp_receiver_canvas
+    width: ${DISPLAY_W}
+    height: ${DISPLAY_H}
+    back_buffers: ${back_buffers}
+    receiving:
+      name: "DDP Stream 1"
+      device_class: connectivity
 
 # -----------------------------
 # LVGL page with a single canvas

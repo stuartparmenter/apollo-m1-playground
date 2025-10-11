@@ -19,31 +19,22 @@ substitutions:
   CANVAS_HEIGHT: ${DISPLAY_H}
 
 # UDP DDP sink + canvas bindings (no w/h required here)
-ddp_stream:
-  id: ddp
-  streams:
-    - id: stream_video
-      canvas: "video_canvas"
-      back_buffers: ${back_buffers}  # 0-2
+ddp_canvas:
+  - id: stream_video
+    canvas: video_canvas
+    back_buffers: ${back_buffers}
 
 # -----------------------------
 # WebSocket control
 # -----------------------------
-ws_ddp_control:
-  id: ws_ddp
+media_proxy_control:
+  id: mp_control
   outputs:
     - id: output_video
-      ddp_stream: stream_video
+      stream: stream_video
       src: ${default_video_src}
-      # width/height optional; if omitted, auto from canvas
-      # width: 64
-      # height: 64
-      # pace: 20
-      # ema: 0.0
-      # expand: auto
-      # loop: true
-      # hw: auto
       format: rgb565
+      loop: true
 
 # -----------------------------
 # LVGL page with a single canvas
@@ -80,6 +71,6 @@ text:
     restore_value: true
     on_value:
       then:
-        - ws_ddp_control.set_src:
+        - media_proxy_control.set_source:
             id: output_video
             src: !lambda "return x;"

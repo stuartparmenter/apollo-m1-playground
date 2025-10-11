@@ -194,19 +194,17 @@ globals:
     initial_value: '0'
 
 # DDP sink + canvas binding
-ddp_stream:
-  id: ddp
-  streams:
-    - id: stream_art_${uid}
-      canvas: "art_canvas_${uid}"
-      back_buffers: 0
+ddp_canvas:
+  - id: stream_art_${uid}
+    canvas: art_canvas_${uid}
+    back_buffers: 0
 
 # WebSocket control for artwork streaming
-ws_ddp_control:
-  id: ws_ddp
+media_proxy_control:
+  id: mp_control
   outputs:
     - id: output_art_${uid}
-      ddp_stream: stream_art_${uid}
+      stream: stream_art_${uid}
       src: ${DEFAULT_ART_SRC}
       loop: false
       format: rgb565
