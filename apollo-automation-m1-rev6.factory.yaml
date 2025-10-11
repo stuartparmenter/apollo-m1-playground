@@ -106,10 +106,17 @@ packages:
     vars:
       page_friendly_name: "Pong"
 
-  # DDP video streaming
+  # DDP display target (stream id 1 -- for LedFx, etc)
+  ddp_receiver: !include
+    file: packages/pages/ddp-receiver.yaml
+    vars:
+      page_friendly_name: "DDP Display"
+      back_buffers: 2
+
+  # Media Proxy controlled DDP video streaming
   ddp_stream: !include
     file: packages/pages/ddp-stream.yaml
     vars:
       page_friendly_name: "Media Stream"
-      back_buffers: 2  # 0-2
+      back_buffers: 2
       default_video_src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"

@@ -112,7 +112,13 @@ packages:
     #     page_friendly_name: "MSR-2 Radar"
     #     msr2_prefix: "apollo_msr_2_xxxxxx"
 
-    # DDP video streaming
+    # DDP display target (stream id 1 -- for LedFx, etc)
+    - path: packages/pages/ddp-receiver.yaml
+      vars:
+        page_friendly_name: "DDP Display"
+        back_buffers: 2  # 0-2
+
+    # Media Proxy controlled DDP video streaming
     - path: packages/pages/ddp-stream.yaml
       vars:
         page_friendly_name: "Media Stream"
