@@ -28,6 +28,9 @@ wifi:
 
 captive_portal:
 
+web_server:
+  version: 3
+
 # This should point to the public location of the yaml file that will be adopted.
 # In this case it is the core yaml file that does not contain the extra things
 # that are provided by this factory yaml file as the user does not need these once adopted.

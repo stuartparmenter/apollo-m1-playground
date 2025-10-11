@@ -27,6 +27,9 @@ wifi:
 
 captive_portal:
 
+web_server:
+  version: 3
+
 packages:
   remote_package_files:
     url: https://github.com/stuartparmenter/apollo-m1-playground
