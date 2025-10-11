@@ -79,7 +79,7 @@ lvgl:
                   #include "esp_app_desc.h"
                   const esp_app_desc_t *app_desc = esp_app_get_description();
                   char buf[64];
-                  snprintf(buf, sizeof(buf), "VER:%s", app_desc->version);
+                  snprintf(buf, sizeof(buf), "V:%s", app_desc->version);
                   return std::string(buf);
             - label:
                 id: bios_cpu
