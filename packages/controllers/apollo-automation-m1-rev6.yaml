@@ -49,7 +49,7 @@ microphone:
     i2s_audio_id: i2s_mic_bus
 
 external_components:
-  - source: github://stuartparmenter/ESPHome-HUB75-MatrixDisplayWrapper@use-official-library
+  - source: github://stuartparmenter/ESPHome-HUB75-MatrixDisplayWrapper@main
 
 display:
   - platform: hub75_matrix_display

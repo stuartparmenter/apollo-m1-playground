@@ -18,7 +18,7 @@ esp32:
       CONFIG_ESP32S3_DATA_CACHE_LINE_64B: y
 
 external_components:
-  - source: github://stuartparmenter/ESPHome-HUB75-MatrixDisplayWrapper@use-official-library
+  - source: github://stuartparmenter/ESPHome-HUB75-MatrixDisplayWrapper@main
 
 display:
   - platform: hub75_matrix_display
