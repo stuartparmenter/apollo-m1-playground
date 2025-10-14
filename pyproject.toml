@@ -1,0 +1,16 @@
+[project]
+name = "apollo-m1-playground"
+version = "0.5.1"
+description = "ESPHome project for HUB75 matrix controllers"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "esphome>=2025.9,<2025.10",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = []
