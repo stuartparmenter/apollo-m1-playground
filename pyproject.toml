@@ -1,0 +1,14 @@
+[project]
+name = "apollo-m1-playground"
+version = "0.5.1"
+description = "ESPHome project for HUB75 matrix controllers"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "esphome>=2025.10,<2026.1",
+    # PlatformIO (used by ESPHome for ESP-IDF builds) expects pip to be available
+    "pip",
+]
+
+[dependency-groups]
+dev = []
