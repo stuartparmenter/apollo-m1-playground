@@ -1,6 +1,6 @@
 # About
 
-ESPHome based firmware for HUB75 LED matrix controllers. Contains interactive pages and effects using LVGL, and allows adoption in ESPHome Builder in Home Assistant for additional customization.
+Ready-to-use ESPHome firmware for HUB75 LED matrix displays with Home Assistant integration. Includes a rich collection of applications—Now Playing with album art, Team Tracker for live sports scores, Clock & Weather Dashboard, Visual Effects, interactive Pong, and more. Built on ESPHome with LVGL for smooth graphics, everything integrates seamlessly with Home Assistant and can be fully customized via YAML configuration.
 
 # Installation
 

@@ -2,87 +2,146 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![ESPHome](https://img.shields.io/badge/ESPHome-2025.10-blue)](https://esphome.io/)
+[![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://www.python.org/)
 
-ESPHome (ESP‑IDF) playground for HUB75 matrix controllers — base config, reusable LVGL pages/effects, and small example "apps." Supports **Apollo Automation M‑1** controllers and **Adafruit Matrix Portal S3**. Targets **ESPHome 2025.10.x** on **ESP‑IDF** (Arduino is not supported).
+**Transform your HUB75 LED matrix into a smart display for Home Assistant.**
+
+Flash ready‑to‑use firmware to your Apollo Automation M‑1 or Adafruit Matrix Portal S3, then enjoy a rich collection of Home Assistant–integrated applications:
+
+Now Playing with album art, Team Tracker for live sports scores, Clock & Weather Dashboard, real‑time Audio Spectrum Visualizer, Visual Effects (fireworks, fireplace, aurora), interactive Pong, MSR‑2 Radar, Countdown Timers, QR codes, and more.
+
+Built on **ESPHome** with **LVGL** for smooth graphics, everything integrates seamlessly with Home Assistant and can be fully customized by editing your device's YAML configuration. Multiple instances of the same page are supported (track multiple teams, rooms, or timers simultaneously).
 
 > **Note**: This repository was formerly named `apollo-m1-playground`. GitHub automatically redirects the old URL, but please update your bookmarks and package references to use the new name.
 
 ---
 
-## Supported Hardware
-Pick the file/firmware that matches your controller:
+## Requirements
 
-### Apollo Automation M‑1 Controllers
-- **rev4:** `apollo-automation-m1-rev4.factory.yaml`
-  - ESP32-S3 with inaccessible PSRAM (effectively no PSRAM)
-  - HUB75 matrix display support
-  - No microphone or accelerometer
+### Hardware
 
-- **rev6:** `apollo-automation-m1-rev6.factory.yaml`
-  - ESP32-S3 with 8MB PSRAM (octal)
-  - HUB75 matrix display support
-  - I²S digital microphone (GPIO 10/11/12) for audio visualization
-  - Enhanced performance with PSRAM for complex pages/effects
+**Supported Controllers:**
 
-### Adafruit Matrix Portal S3
-- **S3:** `adafruit-matrix-portal-s3.factory.yaml`
-  - ESP32-S3 with 2MB PSRAM (quad)
-  - HUB75 matrix display support
-  - Built-in accelerometer (LIS3DH) for motion-based effects
-  - I²S digital microphone for audio visualization
+| Controller | Firmware File | CPU | PSRAM | Microphone | Accelerometer |
+|------------|---------------|-----|-------|------------|---------------|
+| **Apollo M‑1 rev4** | `apollo-automation-m1-rev4.factory.yaml` | ESP32‑S3 | None | ❌ | ❌ |
+| **Apollo M‑1 rev6** | `apollo-automation-m1-rev6.factory.yaml` | ESP32‑S3 | 8MB (octal) | ✅ | ❌ |
+| **Adafruit Matrix Portal S3** | `adafruit-matrix-portal-s3.factory.yaml` | ESP32‑S3 | 2MB (quad) | ❌ | ✅ |
+| **Huidu HD‑WF2** | Coming soon | ESP32‑S3 | None | ❌ | ❌ |
 
-> **Firmware vs. Config Files**: GitHub Releases provide prebuilt binaries built from the **`.factory.yaml`** files for initial flashing. After you **Adopt** the device in ESPHome Builder, it generates a device config based on the corresponding **non-factory** YAML files (e.g., `apollo-automation-m1-rev6.yaml`, `adafruit-matrix-portal-s3.yaml`).
+**HUB75 LED Panels:**
+- Optimized for 64×64 pixel panels
+- Supports 1 or more panels in a chain (tested up to 4)
+- Compatible with standard HUB75 interface panels
+- Other sizes supported (32×32, 64×32, etc.) with configuration changes
 
----
+### Software
 
-## Flash prebuilt firmware (no local toolchain)
-1. Go to **https://stuartparmenter.github.io/hub75-studio/** and select your controller type.
-2. Connect your device via USB and click "Install" to flash directly from your browser.
-3. When prompted, set Wi‑Fi credentials. The device will reboot and announce itself on the network.
-4. Add it to **Home Assistant** (it will be auto‑discovered) or **Adopt** it in the ESPHome Dashboard.
+**For Building from Source (Optional):**
+- **Python 3.11+** required for ESPHome toolchain
+- **ESPHome 2025.10.x** with ESP‑IDF framework (Arduino not supported)
+- **Home Assistant** for full integration features
 
-> **Alternative**: Download firmware from [Releases](/stuartparmenter/hub75-studio/releases) and use **https://web.esphome.io/** to flash manually.
+**For Using Prebuilt Firmware:**
+- No local toolchain required — flash via web browser!
+- **Home Assistant** recommended for entity integration
+
+> **Firmware vs. Config Files**: GitHub Releases provide prebuilt binaries built from the **`.factory.yaml`** files for initial flashing. After you **Adopt** the device in ESPHome, it generates a device config based on the corresponding **non‑factory** YAML files (e.g., `apollo-automation-m1-rev6.yaml`, `adafruit-matrix-portal-s3.yaml`).
 
 ---
 
-## Build & flash locally (developers)
-Requires **ESPHome 2025.10.x** with the **ESP‑IDF** toolchain.
+## Features
 
-**pip + venv (recommended)**
+**Transform Your Matrix Into:**
+- 🎵 **Music Dashboard** — Album art, track info, progress bar (multi‑room support)
+- 🏈 **Sports Center** — Live scores for multiple teams (works with ha‑teamtracker)
+- 🌤️ **Info Display** — Weather, time, person status, timers, QR codes
+- 📊 **Visualizer** — Real‑time audio spectrum, presence radar
+- 🎮 **Entertainment** — Pong, physics simulations, visual effects
+- 🎬 **Media Player** — Stream GIFs, videos, YouTube content
+
+**Built For Home Assistant:**
+- Auto‑discovery and seamless integration
+- Real‑time updates from your entities
+- Control everything from HA dashboard
+
+**Powerful Customization:**
+- Run multiple instances (track multiple teams, rooms, players)
+- WizMote remote control (brightness, page switching, power)
+- Hardware‑specific features (microphone audio viz, accelerometer physics)
+- Fully customizable via YAML configuration
+
+**Developer Friendly:**
+- Prebuilt firmware with web flasher (no toolchain required)
+- Open source and extensible
+- Built on ESP‑IDF with LVGL for smooth graphics
+- Reproducible builds with lockfiles
+
+📖 **[See all 15+ pages with detailed configurations →](https://github.com/stuartparmenter/hub75-studio/wiki/Pages-and-Applications)**
+
+---
+
+## Getting Started
+
+**Quick Installation (Web Flasher)**
+1. Visit **[HUB75 Studio Web Installer](https://stuartparmenter.github.io/hub75-studio/)**
+2. Connect your device via USB and flash firmware
+3. Configure Wi‑Fi and adopt in Home Assistant
+
+📖 **[View detailed installation guide →](https://github.com/stuartparmenter/hub75-studio/wiki/Installation)**
+
+> **Alternative**: Download prebuilt firmware from [Releases](https://github.com/stuartparmenter/hub75-studio/releases) and flash via [web.esphome.io](https://web.esphome.io/)
+
+---
+
+## Customization
+
+Customize your device by editing its YAML configuration in ESPHome. Common customizations include:
+- Display size and layout
+- Weather entities and units
+- Presence / alarm entities
+- DDP / WebSocket streaming host/ports
+- Device‑specific toggles for pages/effects
+- WizMote remote control setup
+
+📖 **[View detailed customization guide (including WizMote setup) →](https://github.com/stuartparmenter/hub75-studio/wiki/Customization)**
+
+> Keep personal entity IDs and secrets in your local device config inside ESPHome; they're **not** tracked in this repo.
+
+---
+
+## Build from Source
+
+**Using uv (recommended)**
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate        # Linux/macOS
-# .venv\Scripts\activate        # Windows PowerShell
-pip install "esphome>=2025.9,<2025.10"
+# Install uv: https://docs.astral.sh/uv/getting-started/installation/
 
-# Build & upload (USB or OTA)
-esphome run apollo-automation-m1-rev4.factory.yaml
+# Build & upload (USB or OTA) - dependencies auto-sync from lockfile
+uv run esphome run apollo-automation-m1-rev4.factory.yaml
 # or
-esphome run apollo-automation-m1-rev6.factory.yaml
+uv run esphome run apollo-automation-m1-rev6.factory.yaml
 # or
-esphome run adafruit-matrix-portal-s3.factory.yaml
+uv run esphome run adafruit-matrix-portal-s3.factory.yaml
 ```
 
-**Docker**
+**Using Docker (no local Python required)**
 ```bash
 docker run --rm -it -v "$PWD":/config esphome/esphome run apollo-automation-m1-rev6.factory.yaml
 ```
 
 ---
 
-## Configure after adoption
-All user‑tunable settings are exposed in the **ESPHome Dashboard** for your device (ESPHome Builder fields / substitutions). Typical options include:
-- Display size and layout
-- Weather entities and units
-- Presence / alarm entities
-- DDP / WebSocket streaming host/ports
-- Device‑specific toggles for pages/effects
+## External Components
+- **HUB75 Display Driver**: [`stuartparmenter/ESPHome-HUB75-MatrixDisplayWrapper`](https://github.com/stuartparmenter/ESPHome-HUB75-MatrixDisplayWrapper)
+- **DDP Stream + WebSocket Control**: [`stuartparmenter/lvgl-ddp-stream`](https://github.com/stuartparmenter/lvgl-ddp-stream)
+- **LVGL Canvas Effects**: [`stuartparmenter/lvgl-canvas-fx`](https://github.com/stuartparmenter/lvgl-canvas-fx)
+- **Page Manager**: [`stuartparmenter/lvgl-page-manager`](https://github.com/stuartparmenter/lvgl-page-manager)
 
-> Keep personal entity IDs and secrets in your local device config inside ESPHome; they’re **not** tracked in this repo.
+> For reproducible builds, prefer **tags** or **commit SHAs** rather than a moving branch.
 
 ---
 
-## Repository layout
+## Repository Layout
 ```
 hub75-studio/
 ├─ apollo-automation-m1-rev4.factory.yaml    # Factory config for Apollo M‑1 rev4
@@ -105,53 +164,15 @@ hub75-studio/
 
 ---
 
-## Pages overview
-- **BIOS** — chip/memory/IDF info via tiny C++ helpers.
-- **Clock • Weather • Status** — Spleen text + Material Design Icons.
-- **FX** — fireworks, fireplace, and other LVGL canvas effects.
-- **Pong** — configurable AI/speeds/sizes via substitutions.
-- **DDP Stream** — LVGL canvas fed by a UDP DDP receiver + optional WebSocket control.
-  > ⚠️ **Note:** Requires [media-proxy](https://github.com/stuartparmenter/media-proxy) running on your network (available as Home Assistant addon).
-- **MSR‑2 Radar** — renders sweep/targets/LEDs based on HA entities.
-- **Microphone / Music Visualizer** — real‑time FFT bars and peaks driven by the on‑board mic.
-
----
-
-## WizMote Remote Control
-
-The project includes support for WizMote remotes using ESPHome's built‑in ESP‑NOW protocol (requires ESPHome 2025.8+).
-
-### Simple Setup Process
-1. **Include WizMote Package**: Add `packages/common/wizmote.yaml` to your device configuration
-2. **Turn on "WizMote Auto‑Discovery"** in Home Assistant
-3. **Press any button on your WizMote** — MAC gets auto‑discovered and auto‑paired
-4. **Done!** Discovery mode automatically turns off and WizMote is ready to use
-
-### Button Functions
-- **ON/OFF**: Display power control
-- **Brightness Up/Down**: Adjust display brightness
-- **Night**: Set minimum brightness
-- **Buttons 1‑4**: Direct page navigation (configurable)
-
-### Status
-View pairing status via the "WizMote Status" entity in Home Assistant.
-
----
-
-## External components
-- **HUB75 Display Driver**: [`stuartparmenter/ESPHome-HUB75-MatrixDisplayWrapper`](https://github.com/stuartparmenter/ESPHome-HUB75-MatrixDisplayWrapper)
-- **DDP Stream + WebSocket Control**: [`stuartparmenter/lvgl-ddp-stream`](https://github.com/stuartparmenter/lvgl-ddp-stream)
-- **LVGL Canvas Effects**: [`stuartparmenter/lvgl-canvas-fx`](https://github.com/stuartparmenter/lvgl-canvas-fx)
-- **Page Manager**: [`stuartparmenter/lvgl-page-manager`](https://github.com/stuartparmenter/lvgl-page-manager)
-
-> For reproducible builds, prefer **tags** or **commit SHAs** rather than a moving branch.
-
----
-
 ## Troubleshooting
-- **Device not found in HA:** Power‑cycle, ensure Wi‑Fi credentials were set during flashing.
-- **Picked the wrong revision:** Re‑flash with the correct `rev4` or `rev6` factory firmware.
-- **USB permissions (Linux):** Add user to dialout/plugdev or use `udev` rules.
+
+**Common Issues:**
+- **Device not found in HA:** Power‑cycle, ensure Wi‑Fi credentials were set during flashing
+- **Picked the wrong revision:** Re‑flash with the correct factory firmware for your hardware
+- **USB permissions (Linux):** Add user to dialout/plugdev or use `udev` rules
+- **Blank display:** Verify you selected the correct controller revision
+
+📖 **[View complete troubleshooting guide →](https://github.com/stuartparmenter/hub75-studio/wiki/Troubleshooting)**
 
 ---
 
@@ -162,5 +183,5 @@ View pairing status via the "WizMote Status" entity in Home Assistant.
 ---
 
 ## License
-- Code & configs: **MIT**
-- Fonts & icons: see `THIRD_PARTY_LICENSES.md`
+- Code & configs: **[MIT](LICENSE)**
+- Fonts & icons: see **[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)**
