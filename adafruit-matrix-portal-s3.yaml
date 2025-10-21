@@ -36,6 +36,9 @@ packages:
     ref: main
     refresh: 0s
     files:
+    # Sets minimum supported ESPHome version
+    - path: packages/common/esphome-version.yaml
+
     # Base board/pins, LVGL root, services, etc.
     - path: packages/controllers/adafruit-matrix-portal-s3.yaml
 

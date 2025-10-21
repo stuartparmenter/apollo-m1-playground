@@ -60,6 +60,9 @@ update:
     source: https://github.com/stuartparmenter/apollo-m1-playground/releases/latest/download/apollo-automation-m1-rev6.manifest.json
 
 packages:
+  # Sets minimum supported ESPHome version
+  esphome_version: !include packages/common/esphome-version.yaml
+
   # Base board/pins, LVGL root, services, etc.
   controller: !include packages/controllers/apollo-automation-m1-rev6.yaml
 

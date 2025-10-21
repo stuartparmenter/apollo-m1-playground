@@ -1,0 +1,6 @@
+# © Copyright 2025 Stuart Parmenter
+# SPDX-License-Identifier: MIT
+
+# Enforce minimum ESPHome version
+esphome:
+  min_version: 2025.10.0

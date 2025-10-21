@@ -60,6 +60,9 @@ update:
     source: https://github.com/stuartparmenter/apollo-m1-playground/releases/latest/download/adafruit-matrix-portal-s3.manifest.json
 
 packages:
+  # Sets minimum supported ESPHome version
+  esphome_version: !include packages/common/esphome-version.yaml
+
   # Base board/pins, LVGL root, services, etc.
   controller: !include packages/controllers/adafruit-matrix-portal-s3.yaml
 
