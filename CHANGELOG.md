@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v0.2.0
 
 ## [Unreleased]
 
-## [v0.6.0] - 2025-10-XX
+## [v0.6.0] - 2025-10-20
 
 ### Added
 - ESPHome minimum version package -- requires ESPHome >= 2025.10.x
