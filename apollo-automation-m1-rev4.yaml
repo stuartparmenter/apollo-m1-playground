@@ -29,7 +29,7 @@ captive_portal:
 
 packages:
   remote_package_files:
-    url: https://github.com/stuartparmenter/apollo-m1-playground
+    url: https://github.com/stuartparmenter/hub75-studio
     ref: main
     refresh: 0s
     files:

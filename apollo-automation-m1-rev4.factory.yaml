@@ -12,7 +12,7 @@ esphome:
   friendly_name: "${friendly_name}"
   name_add_mac_suffix: true
   project:
-    name: stuartparmenter.apollo-m1-playground
+    name: stuartparmenter.hub75-studio
     version: dev # This will be replaced by the github workflows with the `release` version
 
 logger:
@@ -32,7 +32,7 @@ captive_portal:
 # In this case it is the core yaml file that does not contain the extra things
 # that are provided by this factory yaml file as the user does not need these once adopted.
 dashboard_import:
-  package_import_url: github://stuartparmenter/apollo-m1-playground/apollo-automation-m1-rev4.yaml@main
+  package_import_url: github://stuartparmenter/hub75-studio/apollo-automation-m1-rev4.yaml@main
   import_full_config: true
 
 # Sets up Bluetooth LE (Only on ESP32) to allow the user
@@ -54,7 +54,7 @@ ota:
 update:
   - platform: http_request
     name: Firmware
-    source: https://github.com/stuartparmenter/apollo-m1-playground/releases/latest/download/apollo-automation-m1-rev4.manifest.json
+    source: https://github.com/stuartparmenter/hub75-studio/releases/latest/download/apollo-automation-m1-rev4.manifest.json
 
 packages:
   # Sets minimum supported ESPHome version

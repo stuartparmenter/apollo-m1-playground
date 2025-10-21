@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v0.2.0
 
 ## [Unreleased]
 
+## [v0.6.1] - 2025-10-21
+
+### Changed
+- Repository renamed from `apollo-m1-playground` to `hub75-studio` to better reflect the project's support for multiple HUB75 controllers beyond just Apollo Automation hardware
+
 ## [v0.6.0] - 2025-10-20
 
 ### Added

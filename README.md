@@ -1,9 +1,11 @@
-# Apollo M‑1 Playground
+# HUB75 Studio
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![ESPHome](https://img.shields.io/badge/ESPHome-2025.10-blue)](https://esphome.io/)
 
 ESPHome (ESP‑IDF) playground for HUB75 matrix controllers — base config, reusable LVGL pages/effects, and small example "apps." Supports **Apollo Automation M‑1** controllers and **Adafruit Matrix Portal S3**. Targets **ESPHome 2025.10.x** on **ESP‑IDF** (Arduino is not supported).
+
+> **Note**: This repository was formerly named `apollo-m1-playground`. GitHub automatically redirects the old URL, but please update your bookmarks and package references to use the new name.
 
 ---
 
@@ -34,12 +36,12 @@ Pick the file/firmware that matches your controller:
 ---
 
 ## Flash prebuilt firmware (no local toolchain)
-1. Go to **https://stuartparmenter.github.io/apollo-m1-playground/** and select your controller type.
+1. Go to **https://stuartparmenter.github.io/hub75-studio/** and select your controller type.
 2. Connect your device via USB and click "Install" to flash directly from your browser.
 3. When prompted, set Wi‑Fi credentials. The device will reboot and announce itself on the network.
 4. Add it to **Home Assistant** (it will be auto‑discovered) or **Adopt** it in the ESPHome Dashboard.
 
-> **Alternative**: Download firmware from [Releases](/stuartparmenter/apollo-m1-playground/releases) and use **https://web.esphome.io/** to flash manually.
+> **Alternative**: Download firmware from [Releases](/stuartparmenter/hub75-studio/releases) and use **https://web.esphome.io/** to flash manually.
 
 ---
 
@@ -82,7 +84,7 @@ All user‑tunable settings are exposed in the **ESPHome Dashboard** for your de
 
 ## Repository layout
 ```
-apollo-m1-playground/
+hub75-studio/
 ├─ apollo-automation-m1-rev4.factory.yaml    # Factory config for Apollo M‑1 rev4
 ├─ apollo-automation-m1-rev6.factory.yaml    # Factory config for Apollo M‑1 rev6
 ├─ adafruit-matrix-portal-s3.factory.yaml    # Factory config for Matrix Portal S3

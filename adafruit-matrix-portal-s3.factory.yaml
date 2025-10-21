@@ -12,7 +12,7 @@ esphome:
   friendly_name: "${friendly_name}"
   name_add_mac_suffix: true
   project:
-    name: stuartparmenter.apollo-m1-playground
+    name: stuartparmenter.hub75-studio
     version: dev # This will be replaced by the github workflows with the `release` version
 
 logger:
@@ -35,7 +35,7 @@ web_server:
 # In this case it is the core yaml file that does not contain the extra things
 # that are provided by this factory yaml file as the user does not need these once adopted.
 dashboard_import:
-  package_import_url: github://stuartparmenter/apollo-m1-playground/adafruit-matrix-portal-s3.yaml@main
+  package_import_url: github://stuartparmenter/hub75-studio/adafruit-matrix-portal-s3.yaml@main
   import_full_config: true
 
 # Sets up Bluetooth LE (Only on ESP32) to allow the user
@@ -57,7 +57,7 @@ ota:
 update:
   - platform: http_request
     name: Firmware
-    source: https://github.com/stuartparmenter/apollo-m1-playground/releases/latest/download/adafruit-matrix-portal-s3.manifest.json
+    source: https://github.com/stuartparmenter/hub75-studio/releases/latest/download/adafruit-matrix-portal-s3.manifest.json
 
 packages:
   # Sets minimum supported ESPHome version
