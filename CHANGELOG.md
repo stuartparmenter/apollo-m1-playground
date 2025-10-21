@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v0.2.0
 
 ## [Unreleased]
 
+## [v0.6.0] - 2025-10-XX
+
+### Added
+- ESPHome minimum version package -- requires ESPHome >= 2025.10.x
+- DDP receiver page (enabled by default on PSRAM controllers)
+- Binary sensor to detect incoming DDP data on receiver page
+- Web server v3 to PSRAM configs
+- Timer package for countdown timers
+
+### Changed
+- Component rename: lvgl-ddp-stream → ddp-esphome (now at v0.7.2)
+- Bumped lvgl-canvas-fx to v0.3.0 (now includes chipmunk2d directly)
+- Moved display wrapper to use forked display driver w/ brightness and gamma fixes
+- Improved teamtracker NOT_FOUND state handling
+- Simplified page with explicit w/h for mDNS discovery
+- BIOS screen version label shortened (VER: → V:) for better fit
+- Updated workflows and dependabot config
+
+### Fixed
+- Brightness value type (now integer)
+- Added bg_opa for transparent objects
+- Internal placeholder image URL for teamtracker
+
+### Removed
+- Old wledsync page (replaced by ddp-receiver)
+
+## [v0.5.1] - 2025-09-30
+
+### Added
+- Media stream to factory firmware
+- Timer package for countdown timers
+- Improved now-playing logging behavior (only logs when actively playing)
+
+### Changed
+- Bumped lvgl-ddp-stream to v0.5.1
+
+### Fixed
+- Default weather icon text now uses a glyph the font has
+
+## [v0.5.0] - 2025-09-29
+
+### Breaking Changes
+- **BREAKING:** Package variables now use lowercase names
+- **BREAKING:** All pages now require `page_friendly_name` variable
+
+### Added
+- Teamtracker page for sports tracking with ha-teamtracker integration
+- QR code page for displaying QR codes
+- UID support for now-playing page to allow multiple instances
+
+### Changed
+- Bumped lvgl-ddp-stream to v0.5.0
+- Now-playing page shows only album art on single panels
+- WizMote night mode brightness changed to 20
+- Teamtracker styles updated for UID support
+
+### Fixed
+- Removed extra/wrong/unnecessary update logic
+
 ## [v0.4.1] - 2025-09-21
 
 ### Added

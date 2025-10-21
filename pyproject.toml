@@ -1,6 +1,6 @@
 [project]
 name = "apollo-m1-playground"
-version = "0.5.1"
+version = "0.6.0"
 description = "ESPHome project for HUB75 matrix controllers"
 readme = "README.md"
 requires-python = ">=3.11"

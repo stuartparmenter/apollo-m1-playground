@@ -1,6 +1,9 @@
 # Apollo M‑1 Playground
 
-ESPHome (ESP‑IDF) playground for HUB75 matrix controllers — base config, reusable LVGL pages/effects, and small example "apps." Supports **Apollo Automation M‑1** controllers and **Adafruit Matrix Portal S3**. Targets **ESPHome 2025.9.x** on **ESP‑IDF** (Arduino is not supported).
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![ESPHome](https://img.shields.io/badge/ESPHome-2025.10-blue)](https://esphome.io/)
+
+ESPHome (ESP‑IDF) playground for HUB75 matrix controllers — base config, reusable LVGL pages/effects, and small example "apps." Supports **Apollo Automation M‑1** controllers and **Adafruit Matrix Portal S3**. Targets **ESPHome 2025.10.x** on **ESP‑IDF** (Arduino is not supported).
 
 ---
 
@@ -41,7 +44,7 @@ Pick the file/firmware that matches your controller:
 ---
 
 ## Build & flash locally (developers)
-Requires **ESPHome 2025.9.x** with the **ESP‑IDF** toolchain.
+Requires **ESPHome 2025.10.x** with the **ESP‑IDF** toolchain.
 
 **pip + venv (recommended)**
 ```bash
