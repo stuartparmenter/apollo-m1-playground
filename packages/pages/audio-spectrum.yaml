@@ -14,7 +14,7 @@ lvgl_page_manager:
       friendly_name: "${page_friendly_name}"
 
 external_components:
-  - source: github://stuartparmenter/lvgl-canvas-fx@v0.3.0
+  - source: github://stuartparmenter/lvgl-canvas-fx@v0.3.1
     components: [lvgl_canvas_fx]
 
 # ---- Microphone Configuration ----
