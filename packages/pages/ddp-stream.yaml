@@ -14,10 +14,6 @@ lvgl_page_manager:
     - page: ddp_video
       friendly_name: "${page_friendly_name}"
 
-substitutions:
-  CANVAS_WIDTH: ${DISPLAY_W}
-  CANVAS_HEIGHT: ${DISPLAY_H}
-
 # UDP DDP sink + canvas bindings (no w/h required here)
 ddp_canvas:
   - id: stream_video
@@ -45,8 +41,8 @@ lvgl:
       widgets:
         - canvas:
             id: video_canvas
-            width: ${CANVAS_WIDTH}
-            height: ${CANVAS_HEIGHT}
+            width: ${DISPLAY_W}
+            height: ${DISPLAY_H}
       on_load:
         then:
           - lambda: |-
