@@ -3,9 +3,15 @@ substitutions:
   friendly_name: "Matrix Portal S3"
 
   # ===== Display / Panel =====
-  DISPLAY_CHAIN_LEN: "1" # Total number of panels you have connected
-  DISPLAY_W: "64"  # Most likely 64 * ${DISPLAY_CHAIN_LEN}
-  DISPLAY_H: "64"  # Most likely 64
+  display_panel_width: 64
+  display_panel_height: 64
+  display_layout: HORIZONTAL
+  display_layout_rows: 1
+  display_layout_cols: 1
+  display_scan_wiring: STANDARD_TWO_SCAN
+
+  DISPLAY_W: ${display_panel_width * display_layout_cols}
+  DISPLAY_H: ${display_panel_height * display_layout_rows}
 
   # Note: some variables need to be configured at the page level down below
 
@@ -41,6 +47,13 @@ packages:
 
     # Base board/pins, LVGL root, services, etc.
     - path: packages/controllers/adafruit-matrix-portal-s3.yaml
+      vars:
+        panel_width: ${display_panel_width}
+        panel_height: ${display_panel_width}
+        layout: ${display_layout}
+        layout_rows: ${display_layout_rows}
+        layout_cols: ${display_layout_cols}
+        scan_wiring: ${display_scan_wiring}
 
     # Shared helpers, sensors, buttons
     - path: packages/common/utils.yaml
@@ -136,14 +149,3 @@ packages:
     #     uid: "video"
     #     page_friendly_name: "QR Code - Cool Video"
     #     qr_code_text: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-
-
-# If you want to support non-horizontal layouts, you can uncomment this section below:
-# display:
-#   - id: !extend matrix
-#     virtual_matrix:
-#       enabled: true
-#       rows: 2           # number of panel rows
-#       cols: 1           # number of panel columns
-#       chain_type: CHAIN_BOTTOM_RIGHT_UP   # layout mapping type
-#       scan_type: STANDARD_TWO_SCAN        # typical scan type; adjust if your panels are unusual

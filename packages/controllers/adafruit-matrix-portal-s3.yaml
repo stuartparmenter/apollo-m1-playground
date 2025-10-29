@@ -23,35 +23,25 @@ psram:
   speed: 80MHz
 
 external_components:
-  - source: github://stuartparmenter/ESPHome-HUB75-MatrixDisplayWrapper@main
+  - source: github://stuartparmenter/hub75-esphome@main
 
 display:
-  - platform: hub75_matrix_display
+  - platform: hub75
     id: matrix
-    width: ${PANEL_W}
-    height: ${PANEL_H}
-    chain_length: ${DISPLAY_CHAIN_LEN}
-    clock_phase: false # fixes off by 1 issue
-    latch_blanking: 1
-    i2sspeed: HZ_20M
+    board: adafruit-matrix-portal-s3
 
-    # Adafruit MatrixPortal S3 HUB75 pin mappings
-    R1_pin: GPIO42
-    G1_pin: GPIO41
-    B1_pin: GPIO40
-    R2_pin: GPIO38
-    G2_pin: GPIO39
-    B2_pin: GPIO37
-    A_pin:
-      number: GPIO45
-      ignore_strapping_warning: true
-    B_pin:  GPIO36
-    C_pin:  GPIO48
-    D_pin:  GPIO35
-    E_pin:  GPIO21
-    LAT_pin: GPIO47
-    OE_pin:  GPIO14
-    CLK_pin: GPIO2
+    panel_width: ${panel_width}
+    panel_height: ${panel_height}
+    layout: ${layout}
+    layout_rows: ${layout_rows}
+    layout_cols: ${layout_cols}
+    scan_wiring: ${scan_wiring}
+
+    clock_phase: false
+    latch_blanking: 1
+    clock_speed: 20MHz
+
+    bit_depth: 8
 
     # for LVGL
     double_buffer: false

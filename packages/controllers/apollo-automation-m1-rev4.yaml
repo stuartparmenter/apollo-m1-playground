@@ -18,36 +18,25 @@ esp32:
       CONFIG_ESP32S3_DATA_CACHE_LINE_64B: y
 
 external_components:
-  - source: github://stuartparmenter/ESPHome-HUB75-MatrixDisplayWrapper@main
+  - source: github://stuartparmenter/hub75-esphome@main
 
 display:
-  - platform: hub75_matrix_display
+  - platform: hub75
     id: matrix
-    width: ${PANEL_W}
-    height: ${PANEL_H}
-    chain_length: ${DISPLAY_CHAIN_LEN}
-    clock_phase: false # fixes off by 1 issue
-    latch_blanking: 1
-    i2sspeed: HZ_20M
+    board: apollo-automation-m1-rev4
 
-    # Apollo Automation M-1 Controller specific pin mappings
-    # Rev4
-    R1_pin: 42
-    G1_pin: 41
-    B1_pin: 40
-    R2_pin: 38
-    G2_pin: 39
-    B2_pin: 37
-    A_pin:
-      number: 45
-      ignore_strapping_warning: true
-    B_pin: 36
-    C_pin: 48
-    D_pin: 35
-    E_pin: 21
-    LAT_pin: 47
-    OE_pin: 14
-    CLK_pin: 2
+    panel_width: ${panel_width}
+    panel_height: ${panel_height}
+    layout: ${layout}
+    layout_rows: ${layout_rows}
+    layout_cols: ${layout_cols}
+    scan_wiring: ${scan_wiring}
+
+    clock_phase: false
+    latch_blanking: 1
+    clock_speed: 20MHz
+
+    bit_depth: 8
 
     # for LVGL
     double_buffer: false
