@@ -11,8 +11,7 @@
 #   device_id: Device ID for WebSocket identification
 
 external_components:
-  - source: github://stuartparmenter/ddp-esphome@v0.7.3
-    components: [ddp, ddp_canvas, media_proxy_control]
+  - source: github://stuartparmenter/ddp-esphome@v0.7.4
 
 # DDP Canvas Binding
 ddp:
