@@ -1,0 +1,239 @@
+# © Copyright 2025 Your Name
+# SPDX-License-Identifier: MIT
+#
+# Controller: Waveshare ESP32-S3-RGB-Matrix
+# Display: Two 64x64 HUB75 panels, horizontal layout (128x64 total)
+# Audio: ES8311 DAC + ES7210 ADC (I2S)
+# Sensors: SHTCX (temp/humidity), PCF85063 (RTC)
+# Voice: micro_wake_word + voice_assistant
+
+esp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 32MB
+  cpu_frequency: 240MHz
+  framework:
+    type: esp-idf
+    advanced:
+      compiler_optimization: PERF
+      execute_from_psram: true
+      enable_idf_experimental_features: true
+    sdkconfig_options:
+      CONFIG_ESP32S3_DATA_CACHE_LINE_64B: y
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+# ── I²C bus (RTC + audio codecs + temp sensor) ──
+i2c:
+  sda: GPIO47
+  scl: GPIO48
+  id: shared_i2c_bus
+
+# ── RTC ──
+time:
+  - platform: pcf85063
+    i2c_id: shared_i2c_bus
+    address: 0x51
+    id: pcf85063_time
+  - platform: sntp
+    id: ntp_time
+    on_time_sync:
+      then:
+        - pcf85063.write_time:
+
+# ── Temp / Humidity ──
+sensor:
+  - platform: shtcx
+    i2c_id: shared_i2c_bus
+    address: 0x70
+    temperature:
+      name: "Temperature"
+      id: local_temperature
+      filters:
+        - lambda: return x * 9.0/5.0 + 32.0;
+    humidity:
+      name: "Humidity"
+      id: local_humidity
+    update_interval: 60s
+
+# ── I²S bus ──
+i2s_audio:
+  - id: shared_i2s_bus
+    i2s_lrclk_pin: GPIO38
+    i2s_bclk_pin: GPIO43
+    i2s_mclk_pin: GPIO12
+
+# ── Audio DAC (ES8311) ──
+audio_dac:
+  - platform: es8311
+    id: es8311_dac
+    i2c_id: shared_i2c_bus
+    use_microphone: true
+    bits_per_sample: 16bit
+    sample_rate: 48000
+
+# ── Audio ADC (ES7210) ──
+audio_adc:
+  - platform: es7210
+    id: es7210_adc
+    i2c_id: shared_i2c_bus
+    mic_gain: 30
+
+# ── Microphone ──
+microphone:
+  - platform: i2s_audio
+    id: ws_mic
+    i2s_audio_id: shared_i2s_bus
+    i2s_din_pin: GPIO39
+    adc_type: external
+    pdm: false
+    channel: left
+    bits_per_sample: 16bit
+    sample_rate: 16000
+    allow_other_uses: true
+
+# ── Speaker ──
+speaker:
+  - platform: i2s_audio
+    id: ws_speaker
+    dac_type: external
+    i2s_dout_pin: GPIO21
+    i2s_audio_id: shared_i2s_bus
+    allow_other_uses: true
+    channel: mono
+    audio_dac: es8311_dac
+    bits_per_sample: 16bit
+    sample_rate: 16000
+
+# ── Switches ──
+switch:
+  - platform: template
+    id: mic_mute_sw
+    name: "Microphone Enabled"
+    icon: "mdi:microphone"
+    restore_mode: ALWAYS_ON
+    lambda: |-
+      return !id(ws_mic).get_mute_state();
+    turn_on_action:
+      - microphone.unmute: ws_mic
+    turn_off_action:
+      - microphone.mute: ws_mic
+
+  - platform: gpio
+    pin: GPIO46
+    id: mic_power_rail
+    restore_mode: ALWAYS_ON
+    internal: true
+
+  - platform: gpio
+    name: "Speaker Amp"
+    pin: GPIO11
+    id: pa_control
+    restore_mode: RESTORE_DEFAULT_ON
+
+  - platform: template
+    name: "Use Wake Word"
+    id: use_wake_word
+    icon: mdi:microphone-outline
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    entity_category: config
+    on_turn_on:
+      - micro_wake_word.start:
+    on_turn_off:
+      - micro_wake_word.stop:
+
+# ── Wake Word ──
+micro_wake_word:
+  id: ws_micro_wake_word
+  models:
+    - model: okay_nabu
+      probability_cutoff: 0.5
+  on_wake_word_detected:
+    - voice_assistant.start:
+        wake_word: !lambda return wake_word;
+
+# ── Voice Assistant ──
+globals:
+  - id: va_is_idle
+    type: bool
+    restore_value: false
+    initial_value: 'true'
+
+voice_assistant:
+  id: va
+  microphone: ws_mic
+  speaker: ws_speaker
+  micro_wake_word: ws_micro_wake_word
+  volume_multiplier: 2.0
+  auto_gain: 31dBFS
+  noise_suppression_level: 2
+  on_wake_word_detected:
+    - lambda: id(va_is_idle) = false;
+  on_end:
+    - wait_until:
+        not:
+          speaker.is_playing:
+            id: ws_speaker
+    - delay: 200ms
+    - lambda: id(va_is_idle) = true;
+  on_error:
+    - lambda: id(va_is_idle) = true;
+    - delay: 500ms
+  on_client_connected:
+    - delay: 100ms
+    - if:
+        condition:
+          switch.is_on: use_wake_word
+        then:
+          - micro_wake_word.start:
+  on_client_disconnected:
+    - micro_wake_word.stop:
+
+# ── Boot init ──
+esphome:
+  on_boot:
+    priority: -100
+    then:
+      - delay: 3s
+      - lambda: |-
+          id(es8311_dac).set_volume(0.80f);
+
+# ── Display ──
+display:
+  - platform: hub75
+    id: matrix
+    panel_width: ${panel_width}
+    panel_height: ${panel_height}
+    layout: ${layout}
+    layout_rows: ${layout_rows}
+    layout_cols: ${layout_cols}
+    oe_pin: GPIO2
+    c_pin: GPIO3
+    r1_pin: GPIO5
+    g1_pin: GPIO6
+    b1_pin: GPIO4
+    r2_pin: GPIO15
+    b_pin: GPIO8
+    e_pin: GPIO9
+    g2_pin: GPIO16
+    b2_pin: GPIO7
+    a_pin: GPIO18
+    lat_pin: GPIO40
+    clk_pin: GPIO41
+    d_pin: GPIO42
+    clock_phase: false
+    latch_blanking: 1
+    clock_speed: 20MHz
+    bit_depth: 8
+    double_buffer: false
+    auto_clear_enabled: false
+    update_interval: never
+
+# ── LVGL root ──
+lvgl:
+  byte_order: little_endian
+  buffer_size: 100%
+  displays:
+    - matrix
