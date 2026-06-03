@@ -91,7 +91,6 @@ microphone:
     channel: left
     bits_per_sample: 16bit
     sample_rate: 16000
-    allow_other_uses: true
 
 # ── Speaker ──
 speaker:
