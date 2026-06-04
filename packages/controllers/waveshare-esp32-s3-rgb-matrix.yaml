@@ -99,7 +99,6 @@ speaker:
     dac_type: external
     i2s_dout_pin: GPIO21
     i2s_audio_id: shared_i2s_bus
-    allow_other_uses: true
     channel: mono
     audio_dac: es8311_dac
     bits_per_sample: 16bit
