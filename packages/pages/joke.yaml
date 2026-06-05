@@ -1,0 +1,44 @@
+# © Copyright 2026 Wade Edwards
+# SPDX-License-Identifier: MIT
+ 
+# Joke Page
+# Displays a random joke from a Home Assistant sensor.
+# Automatically updates when the sensor value changes.
+# Uses normalize_media_text from utils.yaml for font-safe character handling.
+#
+# Required vars:
+#   page_friendly_name: Name of the page (e.g., Joke of the Minute)
+#   joke_entity: Home Assistant sensor entity ID (e.g., sensor.random_joke)
+ 
+lvgl_page_manager:
+  pages:
+    - page: page_joke
+      friendly_name: "${page_friendly_name}"
+ 
+text_sensor:
+  - platform: homeassistant
+    id: joke_sensor
+    entity_id: ${joke_entity}
+    internal: true
+    on_value:
+      then:
+        - script.execute:
+            id: normalize_media_text
+            widget: !lambda 'return id(lbl_joke_text);'
+            text: !lambda 'return x.c_str();'
+ 
+lvgl:
+  pages:
+    - id: page_joke
+      width: 100%
+      height: 100%
+      widgets:
+        - label:
+            id: lbl_joke_text
+            x: 2
+            y: 2
+            width: 124
+            height: 60
+            text_align: LEFT
+            long_mode: WRAP
+            text: "Loading joke..."
