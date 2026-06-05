@@ -47,11 +47,11 @@ sensor:
   - platform: shtcx
     i2c_id: shared_i2c_bus
     address: 0x70
-    unit_of_measurement: "°F"
-    device_class: temperature
     temperature:
       name: "Temperature"
       id: local_temperature
+      unit_of_measurement: "°F"
+      device_class: temperature
       filters:
         - lambda: return x * 9.0/5.0 + 32.0;
     humidity:
