@@ -1,4 +1,4 @@
-# © Copyright 2025 Your Name
+# © Copyright 2026 Wade Edwards
 # SPDX-License-Identifier: MIT
 #
 # Controller: Waveshare ESP32-S3-RGB-Matrix
@@ -99,7 +99,6 @@ speaker:
     dac_type: external
     i2s_dout_pin: GPIO21
     i2s_audio_id: shared_i2s_bus
-    allow_other_uses: true
     channel: mono
     audio_dac: es8311_dac
     bits_per_sample: 16bit
@@ -210,14 +209,14 @@ display:
     layout_cols: ${layout_cols}
     oe_pin: GPIO2
     c_pin: GPIO3
-    r1_pin: GPIO5
-    g1_pin: GPIO6
-    b1_pin: GPIO4
-    r2_pin: GPIO15
+    r1_pin: GPIO4
+    g1_pin: GPIO5
+    b1_pin: GPIO6
+    r2_pin: GPIO7
     b_pin: GPIO8
     e_pin: GPIO9
-    g2_pin: GPIO16
-    b2_pin: GPIO7
+    g2_pin: GPIO15
+    b2_pin: GPIO16
     a_pin: GPIO18
     lat_pin: GPIO40
     clk_pin: GPIO41
