@@ -47,6 +47,8 @@ sensor:
   - platform: shtcx
     i2c_id: shared_i2c_bus
     address: 0x70
+    unit_of_measurement: "°F"
+    device_class: temperature
     temperature:
       name: "Temperature"
       id: local_temperature
