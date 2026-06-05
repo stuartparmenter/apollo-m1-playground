@@ -176,9 +176,19 @@ voice_assistant:
             id: ws_speaker
     - delay: 200ms
     - lambda: id(va_is_idle) = true;
+    - if:
+        condition:
+          switch.is_on: use_wake_word
+        then:
+          - micro_wake_word.start:
   on_error:
     - lambda: id(va_is_idle) = true;
     - delay: 500ms
+    - if:
+        condition:
+          switch.is_on: use_wake_word
+        then:
+          - micro_wake_word.start:
   on_client_connected:
     - delay: 100ms
     - if:
