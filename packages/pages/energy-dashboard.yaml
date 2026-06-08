@@ -1,0 +1,537 @@
+# Energy Dashboard Page (64×64 HUB75)
+#
+# 4-quadrant layout:
+#
+#   x= 0        32        63
+#   y= 0  ┌──────────┬──────────┐
+#         │  ☀ Solar │  🏠 House│  (MDI icon 16px, centered)
+#         │          │          │
+#         │  XXXXW   │  XXXXW   │  (value, Spleen 8)
+#   y=28  ├──────────┼──────────┤
+#         │  🔋 Batt │  ⚡ Grid │  (MDI icon 16px, centered)
+#         │          │          │
+#         │   XX%    │  XXXXW   │  (value, Spleen 8)
+#   y=56  ├──────────┴──────────┤
+#         │████ N:XXp ████████████│  colour-coded rate strip
+#         │████████████ X:XXp ████│  (Spleen 8; N=now, X=next)
+#   y=63  └─────────────────────┘
+#
+# House icon colour reflects dominant energy source:
+#   yellow  = solar dominant
+#   cyan    = battery dominant
+#   orange  = grid dominant
+#   white   = no active source
+#
+# Grid icon switches between import / export / idle glyphs.
+# Battery icon colour: green >50%, orange 20–50%, red <20%.
+# Rate strip background follows HSV ramp: blue→green→yellow→red.
+#
+# NOTE: Grid power sign convention assumes positive = importing from grid,
+#       negative = exporting to grid. Flip the sign comparisons in
+#       en_grid_power.on_value if your inverter uses the opposite convention.
+#
+# Required vars:
+#   page_friendly_name     - Display name shown in Home Assistant
+#   solar_entity           - HA sensor for PV/solar power (W)
+#   load_entity            - HA sensor for house consumption (W)
+#   grid_entity            - HA sensor for grid power (W)
+#   battery_power_entity   - HA sensor for battery power (W, +ve = charging)
+#   battery_soc_entity     - HA sensor for battery state of charge (%)
+#   current_rate_entity    - HA sensor for current electricity rate (£/kWh)
+#   next_rate_entity       - HA sensor for next electricity rate (£/kWh)
+#   rate_low_threshold     - Cheap rate ceiling in pence (default: 15)
+#   rate_high_threshold    - Expensive rate floor in pence (default: 25)
+
+# ── Page registration ─────────────────────────────────────────────────────────
+lvgl_page_manager:
+  pages:
+    - page: page_energy_dashboard
+      friendly_name: "${page_friendly_name}"
+
+# ── MDI icon font (16 px, minimal glyph set) ─────────────────────────────────
+font:
+  - file: "https://github.com/pavlov-net/hub75-studio/raw/refs/heads/main/fonts/materialdesignicons-webfont.ttf"
+    id: mdi_energy_16
+    size: 16
+    glyphs:
+      - "\U000F0D9B"  # mdi:solar-panel
+      - "\U000F1903"  # mdi:home-lightning-bolt
+      - "\U000F008E"  # mdi:battery-outline      (0%)
+      - "\U000F007A"  # mdi:battery-10
+      - "\U000F007B"  # mdi:battery-20
+      - "\U000F007C"  # mdi:battery-30
+      - "\U000F007D"  # mdi:battery-40
+      - "\U000F007E"  # mdi:battery-50
+      - "\U000F007F"  # mdi:battery-60
+      - "\U000F0080"  # mdi:battery-70
+      - "\U000F0081"  # mdi:battery-80
+      - "\U000F0082"  # mdi:battery-90
+      - "\U000F0079"  # mdi:battery              (100%)
+      - "\U000F089C"  # mdi:battery-charging-10
+      - "\U000F0086"  # mdi:battery-charging-20
+      - "\U000F0087"  # mdi:battery-charging-30
+      - "\U000F0088"  # mdi:battery-charging-40
+      - "\U000F089D"  # mdi:battery-charging-50
+      - "\U000F0089"  # mdi:battery-charging-60
+      - "\U000F089E"  # mdi:battery-charging-70
+      - "\U000F008A"  # mdi:battery-charging-80
+      - "\U000F008B"  # mdi:battery-charging-90
+      - "\U000F0085"  # mdi:battery-charging-100
+      - "\U000F0D3E"  # mdi:transmission-tower        (idle / unknown)
+      - "\U000F192C"  # mdi:transmission-tower-export (exporting to grid)
+      - "\U000F192D"  # mdi:transmission-tower-import (importing from grid)
+
+# ── Globals: retain latest power readings for house-icon colour script ────────
+globals:
+  - id: en_solar_w
+    type: float
+    restore_value: no
+    initial_value: 'NAN'
+  - id: en_grid_w
+    type: float
+    restore_value: no
+    initial_value: 'NAN'
+  - id: en_battery_w
+    type: float
+    restore_value: no
+    initial_value: 'NAN'
+  - id: en_battery_soc_val
+    type: float
+    restore_value: no
+    initial_value: 'NAN'
+  - id: en_battery_show_power
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
+# ── LVGL page ─────────────────────────────────────────────────────────────────
+lvgl:
+  pages:
+    - id: page_energy_dashboard
+      bg_color: 0x000000
+      pad_all: 0
+
+      widgets:
+
+        # ── TOP-LEFT: Solar  (x=0..31  y=0..27) ──────────────────────────────
+        - label:
+            id: en_solar_icon
+            x: 8
+            y: 1
+            text: "\U000F0D9B"
+            text_font: mdi_energy_16
+            text_color: 0x666666      # dim until generating
+
+        - label:
+            id: en_solar_value
+            x: 0
+            y: 19
+            width: 32
+            text_align: CENTER
+            text: "--W"
+            styles: [st_spleen8]
+
+        # ── TOP-RIGHT: House load  (x=32..63  y=0..27) ───────────────────────
+        - label:
+            id: en_house_icon
+            x: 40
+            y: 1
+            text: "\U000F1903"
+            text_font: mdi_energy_16
+            text_color: 0xFFFFFF      # updated at runtime by script
+
+        - label:
+            id: en_house_value
+            x: 32
+            y: 19
+            width: 32
+            text_align: CENTER
+            text: "--W"
+            styles: [st_spleen8]
+
+        # ── BOTTOM-LEFT: Battery  (x=0..31  y=29..55) ────────────────────────
+        - label:
+            id: en_battery_icon
+            x: 8
+            y: 30
+            text: "\U000F0079"
+            text_font: mdi_energy_16
+            text_color: 0x00CC00      # green; changes to orange/red by SoC
+
+        - label:
+            id: en_battery_value
+            x: 0
+            y: 48
+            width: 32
+            text_align: CENTER
+            text: "--%"
+            styles: [st_spleen8]
+
+        # ── BOTTOM-RIGHT: Grid  (x=32..63  y=29..55) ─────────────────────────
+        - label:
+            id: en_grid_icon
+            x: 40
+            y: 30
+            text: "\U000F0D3E"
+            text_font: mdi_energy_16
+            text_color: 0xFFFFFF      # red=import, green=export, white=idle
+
+        - label:
+            id: en_grid_value
+            x: 32
+            y: 48
+            width: 32
+            text_align: CENTER
+            text: "--W"
+            styles: [st_spleen8]
+
+        # ── DIVIDERS ──────────────────────────────────────────────────────────
+        # Vertical centre line  (x=32, full height of quadrant area)
+        - line:
+            id: en_v_divider
+            x: 32
+            y: 0
+            points: ["0,0", "0,55"]
+            line_color: 0x333333
+            line_width: 1
+
+        # Horizontal line between quadrant rows
+        - line:
+            id: en_h_divider
+            x: 0
+            y: 28
+            points: ["0,0", "63,0"]
+            line_color: 0x333333
+            line_width: 1
+
+        # ── RATE STRIP  (y=56..63) ────────────────────────────────────────────
+        # Current rate — left half
+        - obj:
+            id: en_now_rate_bg
+            x: 0
+            y: 56
+            width: 32
+            height: 8
+            bg_color: 0x004080
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+            radius: 0
+            widgets:
+              - label:
+                  id: en_now_rate_label
+                  x: 0
+                  y: 0
+                  width: 32
+                  text_align: CENTER
+                  text: "--p"
+                  styles: [st_spleen8]
+
+        # Next rate — right half
+        - obj:
+            id: en_next_rate_bg
+            x: 32
+            y: 56
+            width: 32
+            height: 8
+            bg_color: 0x004080
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+            radius: 0
+            widgets:
+              - label:
+                  id: en_next_rate_label
+                  x: 0
+                  y: 0
+                  width: 32
+                  text_align: CENTER
+                  text: "--p"
+                  styles: [st_spleen8]
+
+# ── Script: refresh house icon colour from latest power readings ──────────────
+script:
+  - id: en_update_house_colour
+    then:
+      - lvgl.label.update:
+          id: en_house_icon
+          text_color: !lambda |-
+            float solar   = isnan(id(en_solar_w))   ? 0.0f : id(en_solar_w);
+            float grid    = isnan(id(en_grid_w))    ? 0.0f : id(en_grid_w);
+            float battery = isnan(id(en_battery_w)) ? 0.0f : id(en_battery_w);
+            // No active source
+            if (solar <= 0.0f && grid <= 0.0f && battery <= 0.0f)
+              return lv_color_hex(0xFFFFFF);
+            // Battery feeding more than solar
+            if (battery > solar && battery > 0.0f)
+              return lv_color_hex(0x00FFFF);  // cyan
+            // Solar dominant
+            if (solar > 0.0f && solar >= grid)
+              return lv_color_hex(0xFFFF00);  // yellow
+            // Grid dominant
+            return lv_color_hex(0xFFA500);    // orange
+
+  # Render battery label: SoC% or power in W depending on en_battery_show_power
+  - id: en_refresh_battery_label
+    then:
+      - lvgl.label.update:
+          id: en_battery_value
+          text: !lambda |-
+            static char buf[10];
+            if (!id(en_battery_show_power)) {
+              float s = id(en_battery_soc_val);
+              if (isnan(s)) snprintf(buf, sizeof(buf), "--%");
+              else          snprintf(buf, sizeof(buf), "%d%%", (int)s);
+            } else {
+              float w = id(en_battery_w);
+              if (isnan(w)) {
+                snprintf(buf, sizeof(buf), "--W");
+              } else {
+                int a = (int)(w >= 0 ? w : -w);
+                if (a >= 1000) snprintf(buf, sizeof(buf), "%d,%03dW", a/1000, a%1000);
+                else           snprintf(buf, sizeof(buf), "%dW", a);
+              }
+            }
+            return buf;
+          text_color: 0xFFFFFF
+
+  # Render battery icon: glyph reflects SoC level; colour reflects charging state
+  - id: en_refresh_battery_icon
+    then:
+      - lvgl.label.update:
+          id: en_battery_icon
+          text: !lambda |-
+            float soc = id(en_battery_soc_val);
+            float w   = id(en_battery_w);
+            int tier = isnan(soc) ? 0 : (int)(soc / 10.0f);
+            if (tier < 0)  tier = 0;
+            if (tier > 10) tier = 10;
+            if (!isnan(w) && w < 0) {
+              const char* icons[] = {
+                "\U000F089C",  // battery-charging-10 (no 0% charging variant)
+                "\U000F089C",  // battery-charging-10
+                "\U000F0086",  // battery-charging-20
+                "\U000F0087",  // battery-charging-30
+                "\U000F0088",  // battery-charging-40
+                "\U000F089D",  // battery-charging-50
+                "\U000F0089",  // battery-charging-60
+                "\U000F089E",  // battery-charging-70
+                "\U000F008A",  // battery-charging-80
+                "\U000F008B",  // battery-charging-90
+                "\U000F0085",  // battery-charging-100
+              };
+              return icons[tier];
+            }
+            const char* icons[] = {
+              "\U000F008E",  // battery-outline (0%)
+              "\U000F007A",  // battery-10
+              "\U000F007B",  // battery-20
+              "\U000F007C",  // battery-30
+              "\U000F007D",  // battery-40
+              "\U000F007E",  // battery-50
+              "\U000F007F",  // battery-60
+              "\U000F0080",  // battery-70
+              "\U000F0081",  // battery-80
+              "\U000F0082",  // battery-90
+              "\U000F0079",  // battery (100%)
+            };
+            return icons[tier];
+          text_color: !lambda |-
+            float soc = id(en_battery_soc_val);
+            float w   = id(en_battery_w);
+            if (!isnan(w) && w < 0) return lv_color_hex(0x00CC00);  // green  — charging
+            if (isnan(soc))         return lv_color_hex(0x666666);  // dim    — unknown
+            if (soc > 50.0f)        return lv_color_hex(0x00CC00);  // green  — high
+            if (soc > 20.0f)        return lv_color_hex(0xFF8800);  // orange — medium
+            return                         lv_color_hex(0xFF2200);  // red    — low
+
+# ── Interval: cycle battery label between SoC and power every 4 s ─────────────
+interval:
+  - interval: 8s
+    then:
+      - globals.set:
+          id: en_battery_show_power
+          value: !lambda |-
+            float w = id(en_battery_w);
+            if (!isnan(w) && w == 0.0f) return false;
+            return !id(en_battery_show_power);
+      - script.execute: en_refresh_battery_label
+
+# ── Sensors ───────────────────────────────────────────────────────────────────
+sensor:
+
+  # Solar / PV power
+  - platform: homeassistant
+    id: en_solar_power
+    entity_id: ${solar_entity}
+    on_value:
+      - globals.set:
+          id: en_solar_w
+          value: !lambda return x;
+      - lvgl.label.update:
+          id: en_solar_value
+          text: !lambda |-
+            static char buf[10];
+            if (isnan(x)) { snprintf(buf, sizeof(buf), "--W"); }
+            else {
+              int a = (int)x;
+              if (a >= 1000) snprintf(buf, sizeof(buf), "%d,%03dW", a/1000, a%1000);
+              else           snprintf(buf, sizeof(buf), "%dW", a);
+            }
+            return buf;
+      - lvgl.label.update:
+          id: en_solar_icon
+          text_color: !lambda |-
+            return (!isnan(x) && x >= 10.0f)
+              ? lv_color_hex(0xFFFF00)   // yellow — generating
+              : lv_color_hex(0x666666);  // dim    — idle
+      - script.execute: en_update_house_colour
+
+  # House load / consumption
+  - platform: homeassistant
+    id: en_load_power
+    entity_id: ${load_entity}
+    on_value:
+      - lvgl.label.update:
+          id: en_house_value
+          text: !lambda |-
+            static char buf[10];
+            if (isnan(x)) { snprintf(buf, sizeof(buf), "--W"); }
+            else {
+              int a = (int)x;
+              if (a >= 1000) snprintf(buf, sizeof(buf), "%d,%03dW", a/1000, a%1000);
+              else           snprintf(buf, sizeof(buf), "%dW", a);
+            }
+            return buf;
+
+  # Battery state of charge (%)
+  - platform: homeassistant
+    id: en_battery_soc
+    entity_id: ${battery_soc_entity}
+    on_value:
+      - globals.set:
+          id: en_battery_soc_val
+          value: !lambda return x;
+      - script.execute: en_refresh_battery_label
+      - script.execute: en_refresh_battery_icon
+
+  # Battery power — internal; used for house-icon colour and cycling battery label
+  - platform: homeassistant
+    id: en_battery_power
+    entity_id: ${battery_power_entity}
+    internal: true
+    on_value:
+      - globals.set:
+          id: en_battery_w
+          value: !lambda return x;
+      - script.execute: en_update_house_colour
+      - script.execute: en_refresh_battery_label
+      - script.execute: en_refresh_battery_icon
+
+  # Grid power  (+ve = importing, −ve = exporting)
+  - platform: homeassistant
+    id: en_grid_power
+    entity_id: ${grid_entity}
+    on_value:
+      - globals.set:
+          id: en_grid_w
+          value: !lambda return x;
+      - lvgl.label.update:
+          id: en_grid_value
+          text: !lambda |-
+            static char buf[10];
+            if (isnan(x)) { snprintf(buf, sizeof(buf), "--W"); }
+            else {
+              int a = (int)(x >= 0 ? x : -x);
+              if (a >= 1000) snprintf(buf, sizeof(buf), "%d,%03dW", a/1000, a%1000);
+              else           snprintf(buf, sizeof(buf), "%dW", a);
+            }
+            return buf;
+      - lvgl.label.update:
+          id: en_grid_icon
+          text: !lambda |-
+            if (isnan(x) || (x > -10.0f && x < 10.0f)) return "\U000F0D3E";  // idle
+            return (x > 0) ? "\U000F192D" : "\U000F192C";  // import : export
+          text_color: !lambda |-
+            if (isnan(x) || (x > -10.0f && x < 10.0f)) return lv_color_hex(0xFFFFFF);
+            return (x > 0) ? lv_color_hex(0xFF4444)   // red   — importing
+                           : lv_color_hex(0x44FF44);  // green — exporting
+      - script.execute: en_update_house_colour
+
+  # Current electricity rate (£/kWh → display in pence)
+  - platform: homeassistant
+    id: en_current_rate
+    entity_id: ${current_rate_entity}
+    on_value:
+      - lvgl.label.update:
+          id: en_now_rate_label
+          text: !lambda |-
+            static char buf[8];
+            if (isnan(x)) { snprintf(buf, sizeof(buf), "--p"); }
+            else          { snprintf(buf, sizeof(buf), "N:%dp", (int)round(x * 100.0f)); }
+            return buf;
+          # Dark text on green/yellow (light bg), white on blue/red (dark bg)
+          text_color: !lambda |-
+            if (isnan(x)) return lv_color_hex(0xFFFFFF);
+            float p = x * 100.0f;
+            return (p < 0.0f || p >= (float)(${rate_high_threshold}))
+              ? lv_color_hex(0xFFFFFF)
+              : lv_color_hex(0x000000);
+      - lvgl.obj.update:
+          id: en_now_rate_bg
+          bg_color: !lambda |-
+            if (isnan(x)) return lv_color_hex(0x004080);
+            float p = x * 100.0f;
+            if (p < 0.0f)
+              return lv_color_hsv_to_rgb(240, 100, 72);  // blue — negative/free
+            if (p <= ${rate_low_threshold}) {
+              float ratio = p / (float)(${rate_low_threshold});
+              uint16_t hue = (uint16_t)(120.0f + 120.0f * (1.0f - ratio));
+              return lv_color_hsv_to_rgb(hue, 100, 61);  // blue→green
+            }
+            if (p >= ${rate_high_threshold})
+              return lv_color_hsv_to_rgb(0, 100, 72);    // red — expensive
+            float ratio = (p - (float)(${rate_low_threshold})) /
+                          (float)((${rate_high_threshold}) - (${rate_low_threshold}));
+            uint16_t hue = (uint16_t)(120.0f * (1.0f - ratio));
+            uint8_t  val = (uint8_t)(58.0f + 14.0f * ratio);
+            return lv_color_hsv_to_rgb(hue, 100, val);   // green→yellow→red
+
+  # Next electricity rate
+  - platform: homeassistant
+    id: en_next_rate
+    entity_id: ${next_rate_entity}
+    on_value:
+      - lvgl.label.update:
+          id: en_next_rate_label
+          text: !lambda |-
+            static char buf[8];
+            if (isnan(x)) { snprintf(buf, sizeof(buf), "--p"); }
+            else          { snprintf(buf, sizeof(buf), "X:%dp", (int)round(x * 100.0f)); }
+            return buf;
+          # Dark text on green/yellow (light bg), white on blue/red (dark bg)
+          text_color: !lambda |-
+            if (isnan(x)) return lv_color_hex(0xFFFFFF);
+            float p = x * 100.0f;
+            return (p < 0.0f || p >= (float)(${rate_high_threshold}))
+              ? lv_color_hex(0xFFFFFF)
+              : lv_color_hex(0x000000);
+      - lvgl.obj.update:
+          id: en_next_rate_bg
+          bg_color: !lambda |-
+            if (isnan(x)) return lv_color_hex(0x004080);
+            float p = x * 100.0f;
+            if (p < 0.0f)
+              return lv_color_hsv_to_rgb(240, 100, 72);
+            if (p <= ${rate_low_threshold}) {
+              float ratio = p / (float)(${rate_low_threshold});
+              uint16_t hue = (uint16_t)(120.0f + 120.0f * (1.0f - ratio));
+              return lv_color_hsv_to_rgb(hue, 100, 61);
+            }
+            if (p >= ${rate_high_threshold})
+              return lv_color_hsv_to_rgb(0, 100, 72);
+            float ratio = (p - (float)(${rate_low_threshold})) /
+                          (float)((${rate_high_threshold}) - (${rate_low_threshold}));
+            uint16_t hue = (uint16_t)(120.0f * (1.0f - ratio));
+            uint8_t  val = (uint8_t)(58.0f + 14.0f * ratio);
+            return lv_color_hsv_to_rgb(hue, 100, val);
