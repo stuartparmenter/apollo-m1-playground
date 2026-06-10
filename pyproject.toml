@@ -5,7 +5,7 @@ description = "ESPHome project for HUB75 matrix controllers"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "esphome>=2026.5.2,<2026.6",
+    "esphome>=2026.5.3,<2026.6",
     # PlatformIO (used by ESPHome for ESP-IDF builds) expects pip to be available
     "pip",
 ]
