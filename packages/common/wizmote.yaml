@@ -4,21 +4,26 @@
 # WizMote Remote Control
 # Enables WizMote remote support using ESPHome ESP-NOW with MAC filtering and page navigation
 #
+# Each button's action is remappable from Home Assistant via a "WizMote ..."
+# select entity (config category) -- no YAML editing needed. Defaults match
+# the original hardcoded mapping. "Send HA Event" fires esphome.wizmote_event
+# with the button label in the payload.
+#
 # Required vars:
-#   wizmote_page_1: Page ID for button 1
-#   wizmote_page_2: Page ID for button 2
-#   wizmote_page_3: Page ID for button 3
-#   wizmote_page_4: Page ID for button 4
+#   wizmote_page_1: Page ID for the "Show Page 1" action (default for button 1)
+#   wizmote_page_2: Page ID for the "Show Page 2" action (default for button 2)
+#   wizmote_page_3: Page ID for the "Show Page 3" action (default for button 3)
+#   wizmote_page_4: Page ID for the "Show Page 4" action (default for button 4)
 
 substitutions:
   # WizMote button mappings
   WIZMOTE_BUTTON_ON: "1"
   WIZMOTE_BUTTON_OFF: "2"
   WIZMOTE_BUTTON_NIGHT: "3"
-  WIZMOTE_BUTTON_ONE: "113"
-  WIZMOTE_BUTTON_TWO: "72"
-  WIZMOTE_BUTTON_THREE: "40"
-  WIZMOTE_BUTTON_FOUR: "129"
+  WIZMOTE_BUTTON_1: "16"
+  WIZMOTE_BUTTON_2: "17"
+  WIZMOTE_BUTTON_3: "18"
+  WIZMOTE_BUTTON_4: "19"
   WIZMOTE_BUTTON_BRIGHT_UP: "9"
   WIZMOTE_BUTTON_BRIGHT_DOWN: "8"
 
@@ -42,60 +47,172 @@ globals:
     type: std::string
     initial_value: '""'
 
-# Script to process WizMote button actions
-script:
-  - id: process_wizmote_button
-    parameters:
-      button: int
-    then:
-      # Device selection buttons (16-19)
-      - if:
-          condition:
-            lambda: 'return button >= 16 && button <= 19;'
-          then:
-            - lambda: 'ESP_LOGI("wizmote", "Device selection button %d pressed", button);'
-            - if:
-                condition:
-                  lambda: 'return button == 16;'
-                then:
-                  - lvgl_page_manager.page.show:
-                      page: ${wizmote_page_1}
-            - if:
-                condition:
-                  lambda: 'return button == 17;'
-                then:
-                  - lvgl_page_manager.page.show:
-                      page: ${wizmote_page_2}
-            - if:
-                condition:
-                  lambda: 'return button == 18;'
-                then:
-                  - lvgl_page_manager.page.show:
-                      page: ${wizmote_page_3}
-            - if:
-                condition:
-                  lambda: 'return button == 19;'
-                then:
-                  - lvgl_page_manager.page.show:
-                      page: ${wizmote_page_4}
+# One dropdown per WizMote button. Change these in Home Assistant to remap a
+# button -- no YAML editing. "Send HA Event" fires esphome.wizmote_event with
+# the button label in the payload so you can wire it to anything in HA.
+# Defaults match the previous hardcoded behavior.
+select:
+  - platform: template
+    name: "WizMote On"
+    id: wizmote_action_on
+    icon: "mdi:gesture-tap-button"
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    initial_option: "Display On"
+    options: &wizmote_actions
+      - "Nothing"
+      - "Show Page 1"
+      - "Show Page 2"
+      - "Show Page 3"
+      - "Show Page 4"
+      - "Next Page"
+      - "Previous Page"
+      - "Display On"
+      - "Display Off"
+      - "Display Toggle"
+      - "Brightness Up"
+      - "Brightness Down"
+      - "Night Mode"
+      - "Send HA Event"
+  - platform: template
+    name: "WizMote Off"
+    id: wizmote_action_off
+    icon: "mdi:gesture-tap-button"
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    initial_option: "Display Off"
+    options: *wizmote_actions
+  - platform: template
+    name: "WizMote Night"
+    id: wizmote_action_night
+    icon: "mdi:gesture-tap-button"
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    initial_option: "Night Mode"
+    options: *wizmote_actions
+  - platform: template
+    name: "WizMote Brightness Up"
+    id: wizmote_action_bright_up
+    icon: "mdi:gesture-tap-button"
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    initial_option: "Brightness Up"
+    options: *wizmote_actions
+  - platform: template
+    name: "WizMote Brightness Down"
+    id: wizmote_action_bright_down
+    icon: "mdi:gesture-tap-button"
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    initial_option: "Brightness Down"
+    options: *wizmote_actions
+  - platform: template
+    name: "WizMote Button 1"
+    id: wizmote_action_btn1
+    icon: "mdi:gesture-tap-button"
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    initial_option: "Show Page 1"
+    options: *wizmote_actions
+  - platform: template
+    name: "WizMote Button 2"
+    id: wizmote_action_btn2
+    icon: "mdi:gesture-tap-button"
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    initial_option: "Show Page 2"
+    options: *wizmote_actions
+  - platform: template
+    name: "WizMote Button 3"
+    id: wizmote_action_btn3
+    icon: "mdi:gesture-tap-button"
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    initial_option: "Show Page 3"
+    options: *wizmote_actions
+  - platform: template
+    name: "WizMote Button 4"
+    id: wizmote_action_btn4
+    icon: "mdi:gesture-tap-button"
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    initial_option: "Show Page 4"
+    options: *wizmote_actions
 
-      # Power control buttons
+# Scripts to process WizMote button actions
+script:
+  # Run one action. `action` is the chosen menu string; `button` is the label
+  # used in the HA event payload when the action is "Send HA Event".
+  - id: run_wizmote_action
+    parameters:
+      action: string
+      button: string
+    then:
+      - logger.log:
+          tag: wizmote
+          format: "button %s -> %s"
+          args: ['button.c_str()', 'action.c_str()']
       - if:
           condition:
-            lambda: 'return button == 1;'  # ON button
+            lambda: 'return action == "Show Page 1";'
+          then:
+            - lvgl_page_manager.page.show:
+                page: ${wizmote_page_1}
+      - if:
+          condition:
+            lambda: 'return action == "Show Page 2";'
+          then:
+            - lvgl_page_manager.page.show:
+                page: ${wizmote_page_2}
+      - if:
+          condition:
+            lambda: 'return action == "Show Page 3";'
+          then:
+            - lvgl_page_manager.page.show:
+                page: ${wizmote_page_3}
+      - if:
+          condition:
+            lambda: 'return action == "Show Page 4";'
+          then:
+            - lvgl_page_manager.page.show:
+                page: ${wizmote_page_4}
+      - if:
+          condition:
+            lambda: 'return action == "Next Page";'
+          then:
+            - lvgl_page_manager.page.next: {}
+      - if:
+          condition:
+            lambda: 'return action == "Previous Page";'
+          then:
+            - lvgl_page_manager.page.previous: {}
+      - if:
+          condition:
+            lambda: 'return action == "Display On";'
           then:
             - switch.turn_on: power
-
       - if:
           condition:
-            lambda: 'return button == 2;'  # OFF button
+            lambda: 'return action == "Display Off";'
           then:
             - switch.turn_off: power
-
-      # Brightness control buttons
       - if:
           condition:
-            lambda: 'return button == 9;'  # BRIGHT_UP
+            lambda: 'return action == "Display Toggle";'
+          then:
+            - switch.toggle: power
+      - if:
+          condition:
+            lambda: 'return action == "Brightness Up";'
           then:
             - lambda: |-
                 float current = id(brightness).state;
@@ -106,10 +223,9 @@ script:
                 call.set_value(new_brightness);
                 call.perform();
                 ESP_LOGI("wizmote", "Brightness increased: %.0f -> %d", current, new_brightness);
-
       - if:
           condition:
-            lambda: 'return button == 8;'  # BRIGHT_DOWN
+            lambda: 'return action == "Brightness Down";'
           then:
             - lambda: |-
                 float current = id(brightness).state;
@@ -120,16 +236,115 @@ script:
                 call.set_value(new_brightness);
                 call.perform();
                 ESP_LOGI("wizmote", "Brightness decreased: %.0f -> %d", current, new_brightness);
-
       - if:
           condition:
-            lambda: 'return button == 3;'  # NIGHT
+            lambda: 'return action == "Night Mode";'
           then:
             - lambda: |-
                 auto call = id(brightness).make_call();
                 call.set_value(${WIZMOTE_BRIGHTNESS_NIGHT});
                 call.perform();
-                ESP_LOGI("wizmote", "Night mode: brightness set to minimum");
+                ESP_LOGI("wizmote", "Night mode: brightness set to %d", ${WIZMOTE_BRIGHTNESS_NIGHT});
+      - if:
+          condition:
+            lambda: 'return action == "Send HA Event";'
+          then:
+            - homeassistant.event:
+                event: esphome.wizmote_event
+                data:
+                  button: !lambda 'return button;'
+
+  # Look up the configured action for the pressed button, then run it.
+  - id: process_wizmote_button
+    parameters:
+      button: int
+    then:
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_ON};'
+          then:
+            - script.execute:
+                id: run_wizmote_action
+                action: !lambda 'return id(wizmote_action_on).current_option();'
+                button: "on"
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_OFF};'
+          then:
+            - script.execute:
+                id: run_wizmote_action
+                action: !lambda 'return id(wizmote_action_off).current_option();'
+                button: "off"
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_NIGHT};'
+          then:
+            - script.execute:
+                id: run_wizmote_action
+                action: !lambda 'return id(wizmote_action_night).current_option();'
+                button: "night"
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_BRIGHT_UP};'
+          then:
+            - script.execute:
+                id: run_wizmote_action
+                action: !lambda 'return id(wizmote_action_bright_up).current_option();'
+                button: "brightness_up"
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_BRIGHT_DOWN};'
+          then:
+            - script.execute:
+                id: run_wizmote_action
+                action: !lambda 'return id(wizmote_action_bright_down).current_option();'
+                button: "brightness_down"
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_1};'
+          then:
+            - script.execute:
+                id: run_wizmote_action
+                action: !lambda 'return id(wizmote_action_btn1).current_option();'
+                button: "1"
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_2};'
+          then:
+            - script.execute:
+                id: run_wizmote_action
+                action: !lambda 'return id(wizmote_action_btn2).current_option();'
+                button: "2"
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_3};'
+          then:
+            - script.execute:
+                id: run_wizmote_action
+                action: !lambda 'return id(wizmote_action_btn3).current_option();'
+                button: "3"
+      - if:
+          condition:
+            lambda: 'return button == ${WIZMOTE_BUTTON_4};'
+          then:
+            - script.execute:
+                id: run_wizmote_action
+                action: !lambda 'return id(wizmote_action_btn4).current_option();'
+                button: "4"
+      - if:
+          condition:
+            lambda: |-
+              return button != ${WIZMOTE_BUTTON_ON} && button != ${WIZMOTE_BUTTON_OFF} &&
+                     button != ${WIZMOTE_BUTTON_NIGHT} && button != ${WIZMOTE_BUTTON_BRIGHT_UP} &&
+                     button != ${WIZMOTE_BUTTON_BRIGHT_DOWN} && button != ${WIZMOTE_BUTTON_1} &&
+                     button != ${WIZMOTE_BUTTON_2} && button != ${WIZMOTE_BUTTON_3} &&
+                     button != ${WIZMOTE_BUTTON_4};
+          then:
+            - logger.log:
+                tag: wizmote
+                level: WARN
+                format: "unmapped button %d"
+                args: ['button']
 
 # ESP-NOW configuration for WizMote communication
 espnow:
