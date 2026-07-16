@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v0.2.0
 
 ## [Unreleased]
 
+### Changed
+- Bumped lvgl-canvas-fx to v0.4.1 (fixes ESPHome 2026.7 code-generation failure on the chipmunk2d library spec)
+
 ## [v0.6.1] - 2025-10-21
 
 ### Changed
