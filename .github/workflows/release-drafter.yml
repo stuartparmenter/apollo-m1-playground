@@ -15,7 +15,7 @@ jobs:
     environment: release-drafter
     runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
-      - uses: release-drafter/release-drafter@ed4bc48ec97379be2258e7b7ac2624a3e26ab809 # v7
+      - uses: release-drafter/release-drafter@4d75298e00d9e34c483e5ff8c68d0ea1c1940c1e # v7
         id: drafter
 
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -27,7 +27,7 @@ jobs:
           sed -i 's/^version = .*/version = "${{ steps.drafter.outputs.resolved_version }}"/g' pyproject.toml
 
       - name: Install uv
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
 
       - name: Regenerate lockfile
         run: uv lock
