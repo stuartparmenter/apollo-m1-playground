@@ -12,7 +12,7 @@
 lvgl_page_manager:
   pages:
     - page: page_timer${uid}
-      friendly_name: "Timer"
+      friendly_name: "${page_friendly_name}"
 
 # Fetch timer state from Home Assistant
 text_sensor:
