@@ -52,7 +52,7 @@ lvgl:
           # Keep the selected option authoritative: sync effect to current select value
           - lvgl_canvas_fx.set_effect:
               id: cfx
-              effect: !lambda 'return id(fx_effect_select).state;'
+              effect: !lambda 'return id(fx_effect_select).current_option();'
           - lvgl_canvas_fx.resume:
               id: cfx
       on_unload:
