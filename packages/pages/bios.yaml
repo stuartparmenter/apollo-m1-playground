@@ -1,12 +1,6 @@
 # © Copyright 2025 Stuart Parmenter
 # SPDX-License-Identifier: MIT
 
-esphome:
-  platformio_options:
-    build_src_flags:
-      - -include esp_chip_info.h
-      - -include esp_mac.h
-
 wifi:
   on_connect:
     then:
@@ -86,22 +80,7 @@ lvgl:
                 x: 2
                 y: 22
                 styles: [st_spleen8]
-                text: !lambda |-
-                  esp_chip_info_t ci;
-                  esp_chip_info(&ci);
-                  const char *model = "ESP32";
-                  switch (ci.model) {
-                    case CHIP_ESP32:   model = "ESP32";    break;
-                    case CHIP_ESP32S2: model = "ESP32-S2"; break;
-                    case CHIP_ESP32S3: model = "ESP32-S3"; break;
-                    case CHIP_ESP32C3: model = "ESP32-C3"; break;
-                    case CHIP_ESP32C6: model = "ESP32-C6"; break;
-                    case CHIP_ESP32H2: model = "ESP32-H2"; break;
-                    default:           model = "ESP32";    break;
-                  }
-                  char buf[32];
-                  snprintf(buf, sizeof(buf), "CPU:%s", model);
-                  return std::string(buf);
+                text: !lambda 'return std::string("CPU:" ESPHOME_VARIANT);'
             - label:
                 id: bios_mem
                 x: 2
@@ -125,7 +104,7 @@ lvgl:
                 styles: [st_spleen8]
                 text: !lambda |-
                   uint8_t mac[6] = {0};
-                  esp_read_mac(mac, ESP_MAC_WIFI_STA);
+                  get_mac_address_raw(mac);
                   char buf[32];
                   snprintf(buf, sizeof(buf), "ID:%02X%02X%02X", mac[3], mac[4], mac[5]);
                   return std::string(buf);
