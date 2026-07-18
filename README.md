@@ -1,7 +1,7 @@
 # HUB75 Studio
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![ESPHome](https://img.shields.io/badge/ESPHome-2026.5-blue)](https://esphome.io/)
+[![ESPHome](https://img.shields.io/badge/ESPHome-2026.7-blue)](https://esphome.io/)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://www.python.org/)
 
 **Transform your HUB75 LED matrix into a smart display for Home Assistant.**
@@ -39,7 +39,7 @@ Built on **ESPHome** with **LVGL** for smooth graphics, everything integrates se
 
 **For Building from Source (Optional):**
 - **Python 3.11+** required for ESPHome toolchain
-- **ESPHome 2026.5.x** with ESP‑IDF framework (Arduino not supported)
+- **ESPHome 2026.7.x** with ESP‑IDF framework (Arduino not supported)
 - **Home Assistant** for full integration features
 
 **For Using Prebuilt Firmware:**
