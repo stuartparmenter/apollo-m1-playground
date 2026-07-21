@@ -1,0 +1,17 @@
+name: Feature or page request
+description: Suggest a new page, controller, or capability
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like to see?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: How would you use it?
+      description: The Home Assistant integration or hardware this depends on, if any.
+    validations:
+      required: false
