@@ -32,7 +32,8 @@ lvgl:
       text_color: white
 
   # Screen (display) background behind everything
-  disp_bg_color: black
+  bottom_layer:
+    bg_color: black
 
   # Make Spleen 8 the default font everywhere
   default_font: spleen_8
