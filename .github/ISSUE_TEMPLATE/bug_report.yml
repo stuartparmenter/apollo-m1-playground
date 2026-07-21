@@ -1,0 +1,48 @@
+name: Bug report
+description: Something isn't working as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a report. Please strip IPs, MACs, and tokens from any logs you paste.
+  - type: dropdown
+    id: controller
+    attributes:
+      label: Controller
+      options:
+        - Apollo M-1 rev4
+        - Apollo M-1 rev6
+        - Adafruit Matrix Portal S3
+        - Other (describe below)
+    validations:
+      required: true
+  - type: input
+    id: esphome-version
+    attributes:
+      label: ESPHome version
+      placeholder: "2026.7.x"
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Firmware source
+      description: The prebuilt release tag you flashed, or the commit you built from.
+    validations:
+      required: false
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, what happened instead, and how can it be reproduced?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: ESPHome build or runtime logs. This is automatically formatted, so no backticks are needed.
+      render: shell
+    validations:
+      required: false
