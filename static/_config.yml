@@ -1,4 +1,2 @@
-# CHANGEME: Set these variable to your liking
 title: HUB75 Studio
-description: Powered by ESPHome and ESP Web Tools
-theme: jekyll-theme-slate
+description: Ready-to-use ESPHome firmware for HUB75 LED matrix displays

@@ -1,0 +1,361 @@
+/* HUB75 Studio installer. Hand-written, no build step. */
+
+:root {
+  --bg: #fbfaf8;
+  --surface: #ffffff;
+  --border: #e6e3de;
+  --text: #1a1b22;
+  --muted: #666b7a;
+  --pink: #ff5ea8;
+  --violet: #8f6bff;
+  --blue: #5ea8ff;
+  --amber: #ffd24d;
+  --selected-bg: #fff5fa;
+  --shadow: 0 1px 2px rgba(26, 27, 34, 0.06);
+  --shadow-lift: 0 2px 14px rgba(255, 94, 168, 0.18);
+  --glow: radial-gradient(60% 100% at 28% 0%, rgba(255, 94, 168, 0.15) 0%, transparent 70%),
+          radial-gradient(60% 100% at 76% 8%, rgba(94, 168, 255, 0.15) 0%, transparent 70%);
+  --glow-blur: 10px;
+  --header-bg: rgba(255, 255, 255, 0.82);
+  --code-bg: #f1eeea;
+}
+
+[data-theme="dark"] {
+  --bg: #0f1015;
+  --surface: rgba(255, 255, 255, 0.04);
+  --border: rgba(255, 255, 255, 0.09);
+  --text: #eceef4;
+  --muted: #a2a8b8;
+  --selected-bg: rgba(255, 94, 168, 0.08);
+  --shadow: none;
+  --shadow-lift: 0 2px 18px rgba(255, 94, 168, 0.22);
+  --glow: radial-gradient(60% 100% at 28% 0%, rgba(255, 94, 168, 0.2) 0%, transparent 70%),
+          radial-gradient(60% 100% at 76% 8%, rgba(94, 168, 255, 0.2) 0%, transparent 70%);
+  --glow-blur: 6px;
+  --header-bg: rgba(15, 16, 21, 0.82);
+  --code-bg: rgba(255, 255, 255, 0.07);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg: #0f1015;
+    --surface: rgba(255, 255, 255, 0.04);
+    --border: rgba(255, 255, 255, 0.09);
+    --text: #eceef4;
+    --muted: #a2a8b8;
+    --selected-bg: rgba(255, 94, 168, 0.08);
+    --shadow: none;
+    --shadow-lift: 0 2px 18px rgba(255, 94, 168, 0.22);
+    --glow: radial-gradient(60% 100% at 28% 0%, rgba(255, 94, 168, 0.2) 0%, transparent 70%),
+            radial-gradient(60% 100% at 76% 8%, rgba(94, 168, 255, 0.2) 0%, transparent 70%);
+    --glow-blur: 6px;
+    --header-bg: rgba(15, 16, 21, 0.82);
+    --code-bg: rgba(255, 255, 255, 0.07);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; }
+a:hover { color: var(--pink); }
+
+code {
+  background: var(--code-bg);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: .9em;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+}
+
+/* ---------- header ---------- */
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 20px;
+  background: var(--header-bg);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  text-decoration: none;
+}
+.brand:hover { color: inherit; }
+
+.site-header nav {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  font-size: 14px;
+}
+.site-header nav a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.theme-btn {
+  display: grid;
+  place-items: center;
+  width: 32px; height: 32px;
+  padding: 0;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.theme-btn:hover { color: var(--text); border-color: var(--pink); }
+.theme-mode::before { content: "\2600"; font-size: 15px; }
+[data-theme="dark"] .theme-mode::before { content: "\263E"; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .theme-mode::before { content: "\263E"; }
+}
+
+/* ---------- layout ---------- */
+
+main {
+  position: relative;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 8px 20px 64px;
+}
+
+/* The light spill behind the hero. Purely decorative, sits under the content. */
+main::before {
+  content: "";
+  position: absolute;
+  inset: -60px -40px auto;
+  height: 420px;
+  background: var(--glow);
+  filter: blur(var(--glow-blur));
+  pointer-events: none;
+  z-index: -1;
+}
+
+.hero { padding: 48px 0 8px; }
+.hero h1 {
+  margin: 0 0 12px;
+  font-size: clamp(28px, 5vw, 40px);
+  font-weight: 800;
+  letter-spacing: -.025em;
+  line-height: 1.1;
+}
+.hero p {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--muted);
+}
+.hero .release {
+  margin-top: 14px;
+  font-size: 14px;
+}
+
+.step { padding: 32px 0 0; }
+.step h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  font-size: 20px;
+  letter-spacing: -.015em;
+}
+.step h2 .num {
+  display: grid;
+  place-items: center;
+  width: 26px; height: 26px;
+  flex: none;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--pink), var(--violet));
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+.step p { margin: 0 0 12px; color: var(--muted); }
+.step p strong, .step p code { color: var(--text); }
+
+.hint { font-size: 14px; }
+
+/* ---------- controller picker ---------- */
+
+.devices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+}
+
+.device { cursor: pointer; }
+.device input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.device-body {
+  display: block;
+  height: 100%;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  transition: border-color .15s, box-shadow .15s, background .15s;
+}
+.device:hover .device-body { border-color: var(--muted); }
+
+.device input:checked + .device-body {
+  border-color: var(--pink);
+  background: var(--selected-bg);
+  box-shadow: var(--shadow-lift);
+}
+.device input:focus-visible + .device-body {
+  outline: 2px solid var(--violet);
+  outline-offset: 2px;
+}
+
+.device-name {
+  display: block;
+  font-weight: 600;
+  font-size: 15px;
+}
+.device-spec {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Little HUB75 panel motif standing in for a product photo. */
+.panel {
+  display: block;
+  height: 46px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  background-color: #16171d;
+  background-image:
+    radial-gradient(circle at center, var(--dot, var(--pink)) 40%, transparent 45%),
+    linear-gradient(rgba(255, 255, 255, .05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, .05) 1px, transparent 1px);
+  background-size: 8px 8px, 8px 8px, 8px 8px;
+  opacity: .85;
+}
+.panel[data-tint="pink"] { --dot: rgba(255, 94, 168, .55); }
+.panel[data-tint="violet"] { --dot: rgba(143, 107, 255, .55); }
+.panel[data-tint="blue"] { --dot: rgba(94, 168, 255, .55); }
+.device input:checked + .device-body .panel { opacity: 1; }
+
+/* ---------- install ---------- */
+
+.install { margin: 4px 0 14px; }
+
+.btn {
+  display: inline-block;
+  padding: 11px 26px;
+  background: linear-gradient(90deg, var(--pink), var(--violet));
+  border: 0;
+  border-radius: 10px;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn:hover { filter: brightness(1.07); }
+.btn:focus-visible { outline: 2px solid var(--violet); outline-offset: 3px; }
+
+.notice {
+  display: block;
+  max-width: 62ch;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--amber);
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.customize {
+  margin-top: 8px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.customize summary { cursor: pointer; font-weight: 600; }
+.customize p { margin: 10px 0 0; }
+
+/* ---------- apps ---------- */
+
+.apps { padding: 44px 0 0; }
+.apps h2 { margin: 0 0 8px; font-size: 20px; letter-spacing: -.015em; }
+.apps-intro { margin: 0 0 16px; color: var(--muted); max-width: 62ch; }
+
+.app-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.app-grid li {
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.app-grid strong {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--text);
+  font-size: 15px;
+}
+.apps-more { margin: 16px 0 0; font-size: 14px; }
+.apps-more a { color: var(--pink); text-decoration: none; font-weight: 600; }
+
+/* ---------- footer ---------- */
+
+.site-footer {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 24px 20px 48px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 14px;
+}
+.site-footer p { margin: 0 0 6px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
