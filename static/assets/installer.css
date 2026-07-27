@@ -254,24 +254,18 @@ main::before {
   font-size: 13px;
 }
 
-/* Little HUB75 panel motif standing in for a product photo. */
-.panel {
+/* Product photos sit on their own white tile so the light and dark themes both
+   get a consistent backdrop behind shots with different backgrounds. */
+.device-body img {
   display: block;
-  height: 46px;
+  width: 100%;
+  height: 120px;
   margin-bottom: 10px;
-  border-radius: 8px;
-  background-color: #16171d;
-  background-image:
-    radial-gradient(circle at center, var(--dot, var(--pink)) 40%, transparent 45%),
-    linear-gradient(rgba(255, 255, 255, .05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, .05) 1px, transparent 1px);
-  background-size: 8px 8px, 8px 8px, 8px 8px;
-  opacity: .85;
+  padding: 4px;
+  object-fit: contain;
+  background: #fff;
+  border-radius: 10px;
 }
-.panel[data-tint="pink"] { --dot: rgba(255, 94, 168, .55); }
-.panel[data-tint="violet"] { --dot: rgba(143, 107, 255, .55); }
-.panel[data-tint="blue"] { --dot: rgba(94, 168, 255, .55); }
-.device input:checked + .device-body .panel { opacity: 1; }
 
 /* ---------- install ---------- */
 
