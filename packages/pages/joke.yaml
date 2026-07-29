@@ -35,10 +35,10 @@ lvgl:
       widgets:
         - label:
             id: lbl_joke_text
-            x: 2
-            y: 2
-            width: 124
-            height: 60
-            text_align: LEFT
+            x: 0
+            y: 0
+            width: 100%
+            height: 100%
+            text_align: CENTER
             long_mode: WRAP
             text: "Loading joke..."
