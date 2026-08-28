@@ -51,6 +51,18 @@ lvgl:
         then:
           - lambda: |-
               id(output_video).stop();
+              lv_canvas_fill_bg(id(video_canvas), lv_color_black(), LV_OPA_COVER);
+
+# -----------------------------
+# Auto-switch page when source changes
+# -----------------------------
+switch:
+  - platform: template
+    id: video_src_auto_switch_page
+    name: "Auto-switch to ${page_friendly_name} on source change"
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
 
 # -----------------------------
 # Runtime source change
@@ -70,3 +82,13 @@ text:
         - media_proxy_control.set_source:
             id: output_video
             src: !lambda "return x;"
+        # Only jump to the stream page on real runtime changes (API connected),
+        # not on boot-time replays of the restored value.
+        - if:
+            condition:
+              and:
+                - switch.is_on: video_src_auto_switch_page
+                - lambda: 'return api::global_api_server != nullptr && api::global_api_server->is_connected();'
+            then:
+              - lvgl_page_manager.page.show:
+                  page: ddp_video
