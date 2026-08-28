@@ -1,0 +1,141 @@
+# © Copyright 2025 Stuart Parmenter
+# SPDX-License-Identifier: MIT
+
+# Retro Games Page
+# Interactive retro games using games-esphome component
+# - Snake and Breakout with runtime switching
+# - Frame-independent game logic with configurable FPS
+# - Input controls via WizMote, buttons, or Home Assistant
+#
+# Required vars:
+#   page_friendly_name: Name of the page (e.g., Games)
+
+lvgl_page_manager:
+  pages:
+    - page: games_page
+      friendly_name: "${page_friendly_name}"
+
+substitutions:
+  GAMES_FPS: "30"                      # Target frame rate (1-240)
+
+esp32_ble:
+  id: ble
+  
+# External component from games-esphome repository
+external_components:
+  - source: github://stuartparmenter/games-esphome@main
+
+ble_gamepad:
+  id: gamepad
+  ble_id: ble  # Reference to esp32_ble component
+
+  # Automation triggers
+  on_connect:
+    then:
+      - logger.log: "Controller connected!"
+      - lvgl_game_runner.resume:
+          id: game_runner
+
+  on_disconnect:
+    then:
+      - logger.log: "Controller disconnected!"
+      - lvgl_game_runner.pause:
+          id: game_runner
+
+  on_button:
+    then:
+      # Forward button presses to game runner
+      # Trigger passes: input (string) and pressed (bool)
+      - lambda: |-
+          // Forward button event to game runner
+          id(game_runner).send_input(input.c_str(), pressed);
+
+          // Example: Start button toggles pause
+          if (input == "START" && pressed) {
+            id(game_runner).toggle();
+          }
+
+  on_stick:
+    then:
+      # Map analog sticks to directional inputs (with deadzone)
+      - lambda: |-
+          auto state = id(gamepad).get_state();
+          if (!state) return;
+
+          // Left stick to D-pad mapping with 50% threshold
+          constexpr int8_t THRESHOLD = 64;  // ~50% of max 127
+
+          // Horizontal mapping (X axis)
+          if (state->left_stick_x > THRESHOLD) {
+            // Moving right
+            id(game_runner).send_input("RIGHT", true);
+          } else if (state->left_stick_x < -THRESHOLD) {
+            // Moving left
+            id(game_runner).send_input("LEFT", true);
+          }
+
+          // Vertical mapping (Y axis)
+          if (state->left_stick_y > THRESHOLD) {
+            // Moving up
+            id(game_runner).send_input("UP", true);
+          } else if (state->left_stick_y < -THRESHOLD) {
+            // Moving down
+            id(game_runner).send_input("DOWN", true);
+          }
+
+# Register game components (required for game registry)
+game_snake:
+  id: snake
+
+game_breakout:
+  id: breakout
+
+game_pong:
+  id: pong
+
+# Home Assistant game selector
+select:
+  - platform: template
+    id: game_select
+    name: "Game"
+    icon: "mdi:gamepad-variant"
+    optimistic: true
+    options:
+      - snake
+      - breakout
+      - pong
+    initial_option: snake
+    set_action:
+      - lvgl_game_runner.set_game:
+          id: game_runner
+          game: !lambda 'return x;'
+
+# Game runner configuration
+lvgl_game_runner:
+  id: game_runner
+  game: snake
+  canvas: game_canvas
+  fps: ${GAMES_FPS}
+  start_paused: true
+
+# LVGL page with canvas for game rendering
+lvgl:
+  pages:
+    - id: games_page
+      widgets:
+        - canvas:
+            id: game_canvas
+            width: ${DISPLAY_W}
+            height: ${DISPLAY_H}
+      on_load:
+        then:
+          # Keep the selected option authoritative: sync game to current select value
+          - lvgl_game_runner.set_game:
+              id: game_runner
+              game: !lambda 'return id(game_select).state;'
+          - lvgl_game_runner.resume:
+              id: game_runner
+      on_unload:
+        then:
+          - lvgl_game_runner.pause:
+              id: game_runner
