@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v0.2.0
 
 ### Changed
 - Bumped lvgl-canvas-fx to v0.4.1 (fixes ESPHome 2026.7 code-generation failure on the chipmunk2d library spec)
+- Rebuilt the web installer page: controller cards with per-board specs, numbered install steps, Home Assistant
+  adoption guidance, light/dark theme, latest-release line, and a browser-support fallback. Replaces the
+  jekyll-theme-slate page and its radio list. M-1 rev6 is now the default selection
 
 ## [v0.6.1] - 2025-10-21
 

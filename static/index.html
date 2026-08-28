@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HUB75 Studio Installer</title>
+<meta name="description" content="Flash HUB75 Studio firmware to your LED matrix controller from the browser.">
+<meta property="og:title" content="HUB75 Studio Installer">
+<meta property="og:description" content="Flash HUB75 Studio firmware to your LED matrix controller from the browser.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230f1015'/%3E%3Crect x='3' y='3' width='4' height='4' fill='%23ff5ea8'/%3E%3Crect x='9' y='3' width='4' height='4' fill='%238f6bff'/%3E%3Crect x='3' y='9' width='4' height='4' fill='%235ea8ff'/%3E%3Crect x='9' y='9' width='4' height='4' fill='%23ffd24d'/%3E%3C/svg%3E">
+<script>
+  // Set the theme before first paint so the page never flashes the wrong one.
+  (function () {
+    try {
+      var t = localStorage.getItem('theme');
+      if (t === 'dark' || t === 'light') {
+        document.documentElement.setAttribute('data-theme', t);
+      }
+    } catch (e) {}
+  }());
+</script>
+<link rel="stylesheet" href="assets/installer.css">
+</head>
+<body>
+
+<header class="site-header">
+  <a class="brand" href="./">
+    <svg class="brand-mark" viewBox="0 0 16 16" aria-hidden="true" width="22" height="22">
+      <rect x="1" y="1" width="6" height="6" rx="1" fill="#ff5ea8"/>
+      <rect x="9" y="1" width="6" height="6" rx="1" fill="#8f6bff"/>
+      <rect x="1" y="9" width="6" height="6" rx="1" fill="#5ea8ff"/>
+      <rect x="9" y="9" width="6" height="6" rx="1" fill="#ffd24d"/>
+    </svg>
+    <span>HUB75 Studio</span>
+  </a>
+  <nav>
+    <a href="https://github.com/pavlov-net/hub75-studio/wiki">Docs</a>
+    <a href="https://github.com/pavlov-net/hub75-studio">GitHub</a>
+    <button id="theme-toggle" class="theme-btn" type="button" title="Toggle theme" aria-label="Toggle theme">
+      <span class="theme-mode" aria-hidden="true"></span>
+    </button>
+  </nav>
+</header>
+
+<main>
+  <section class="hero">
+    <h1>Flash your HUB75 matrix from the browser</h1>
+    <p>Plug your controller in over USB, pick it below, and you will be running HUB75 Studio in a couple of
+       minutes. No toolchain, no command line.</p>
+    <p class="release" id="release-line" hidden></p>
+  </section>
+
+  <section class="step" aria-labelledby="step-1">
+    <h2 id="step-1"><span class="num">1</span> Choose your controller</h2>
+    <fieldset class="devices">
+      <legend class="visually-hidden">Controller</legend>
+
+      <!-- Product photos: images/apollo-m1.jpg from apolloautomation.com,
+           images/adafruit-matrix-portal-s3.jpg from adafruit.com. -->
+      <label class="device">
+        <input type="radio" name="controller" value="apollo-automation-m1-rev6" checked>
+        <span class="device-body">
+          <img src="images/apollo-m1.jpg" alt="Apollo Automation M-1" width="600" height="600" loading="lazy">
+          <span class="device-name">Apollo Automation M-1 rev6</span>
+          <span class="device-spec">ESP32-S3 · 8MB PSRAM · microphone</span>
+        </span>
+      </label>
+
+      <label class="device">
+        <input type="radio" name="controller" value="apollo-automation-m1-rev4">
+        <span class="device-body">
+          <img src="images/apollo-m1.jpg" alt="Apollo Automation M-1" width="600" height="600" loading="lazy">
+          <span class="device-name">Apollo Automation M-1 rev4</span>
+          <span class="device-spec">ESP32-S3 · no PSRAM</span>
+        </span>
+      </label>
+
+      <label class="device">
+        <input type="radio" name="controller" value="adafruit-matrix-portal-s3">
+        <span class="device-body">
+          <img src="images/adafruit-matrix-portal-s3.jpg" alt="Adafruit Matrix Portal S3" width="600" height="450" loading="lazy">
+          <span class="device-name">Adafruit Matrix Portal S3</span>
+          <span class="device-spec">ESP32-S3 · 2MB PSRAM · accelerometer</span>
+        </span>
+      </label>
+    </fieldset>
+    <p class="hint">Not sure which M-1 you have? The revision is printed on the back of the board.</p>
+  </section>
+
+  <section class="step" aria-labelledby="step-2">
+    <h2 id="step-2"><span class="num">2</span> Connect and install</h2>
+    <p>Connect the controller to this computer with a USB data cable, then click Connect and pick its serial
+       port. Installing erases whatever is on the device and writes a fresh copy of HUB75 Studio.</p>
+    <div class="install">
+      <esp-web-install-button manifest="firmware/apollo-automation-m1-rev6.manifest.json">
+        <button slot="activate" class="btn">Connect</button>
+        <span slot="unsupported" class="notice">
+          Your browser cannot talk to serial devices. Use desktop Chrome or Edge, or flash the firmware from
+          <a href="https://github.com/pavlov-net/hub75-studio/releases">Releases</a> with
+          <a href="https://web.esphome.io/">web.esphome.io</a>.
+        </span>
+        <span slot="not-allowed" class="notice">
+          Serial access needs a secure page. Open this installer over HTTPS.
+        </span>
+      </esp-web-install-button>
+    </div>
+    <p class="hint">During install you can join the device to Wi-Fi. If you skip that, it opens its own
+       <strong>HUB75 Studio</strong> hotspot you can connect to afterwards to set the network.</p>
+  </section>
+
+  <section class="step" aria-labelledby="step-3">
+    <h2 id="step-3"><span class="num">3</span> Adopt it in Home Assistant</h2>
+    <p>Once the device is on your Wi-Fi it announces itself on the network. In Home Assistant go to
+       <strong>Settings → Devices &amp; services</strong>, where it shows up as a discovered
+       <strong>ESPHome</strong> device. Click <strong>Configure</strong> and you are done.</p>
+    <details class="customize">
+      <summary>Want to customize the firmware?</summary>
+      <p>The firmware ships with <code>dashboard_import</code>, so the device also appears in the
+         <strong>ESPHome Dashboard</strong> (or the ESPHome add-on) under <strong>Discovered</strong>. Click
+         <strong>Take control</strong> to pull its configuration in, then edit the YAML and flash updates over
+         Wi-Fi. Panel size, weather entities, presence entities, DDP streaming and WizMote pairing all live
+         there. The
+         <a href="https://github.com/pavlov-net/hub75-studio/wiki/Customization">customization guide</a>
+         walks through the common changes.</p>
+    </details>
+  </section>
+
+  <section class="apps" aria-labelledby="apps-h">
+    <h2 id="apps-h">What you get</h2>
+    <p class="apps-intro">Every install includes the full set of pages. Turn them on and off, and run more than
+       one copy of a page, from Home Assistant.</p>
+    <ul class="app-grid">
+      <li><strong>Now Playing</strong>Album art, track info and a progress bar, per media player.</li>
+      <li><strong>Team Tracker</strong>Live scores and game state for the teams you follow.</li>
+      <li><strong>Clock &amp; Weather</strong>Time, forecast, person status and countdown timers.</li>
+      <li><strong>Audio Spectrum</strong>Real-time visualizer on controllers with a microphone.</li>
+      <li><strong>Visual Effects</strong>Fireworks, fireplace and aurora, plus a physics sandbox.</li>
+      <li><strong>Pong</strong>Playable on the panel, controlled from Home Assistant.</li>
+      <li><strong>MSR-2 Radar</strong>Plots mmWave presence targets as they move around the room.</li>
+      <li><strong>QR &amp; DDP</strong>Show a QR code, or stream pixels to the panel over DDP.</li>
+    </ul>
+    <p class="apps-more">
+      <a href="https://github.com/pavlov-net/hub75-studio/wiki/Pages-and-Applications">See every page and its
+      configuration →</a>
+    </p>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <p>
+    <a href="https://github.com/pavlov-net/hub75-studio">HUB75 Studio</a> is MIT licensed. Built with
+    <a href="https://esphome.io/">ESPHome</a> and
+    <a href="https://esphome.github.io/esp-web-tools/">ESP Web Tools</a>.
+  </p>
+  <p><a href="https://github.com/pavlov-net/hub75-studio/releases">Releases</a> ·
+     <a href="https://github.com/pavlov-net/hub75-studio/wiki/Installation">Installation guide</a> ·
+     <a href="https://github.com/pavlov-net/hub75-studio/issues">Report an issue</a></p>
+</footer>
+
+<script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+<script src="assets/installer.js"></script>
+</body>
+</html>
