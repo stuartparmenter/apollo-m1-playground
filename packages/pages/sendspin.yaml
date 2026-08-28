@@ -4,12 +4,20 @@
 # SendSpin Music Player Page
 # Displays album art, scrolling track info, and a progress bar for music
 # streamed to the device via the SendSpin ESPHome media_player component.
-# Designed for a single 64x64 panel.
+#
+# Layout sizes itself from the device's DISPLAY_W / DISPLAY_H, so the page
+# works on any panel size:
+#   - Square displays (W == H): album art fills the square; the track text
+#     overlays the bottom of the art with the progress bar below it.
+#   - Wide displays  (W >  H): album art is an HxH square on the right; the
+#     track text fills a column on the left with the progress bar along its
+#     bottom (same shape as now-playing.yaml).
+# Fonts use the existing spleen_8 / spleen_16 (theme.yaml), chosen by height.
 #
 # Album art is streamed through the shared media proxy over DDP (same path
 # as now-playing.yaml) rather than decoded on-device. This keeps memory
-# pressure low (no JPEG decoder, no raw-image buffer) and lets devices
-# without PSRAM run the page. See Caveats below.
+# pressure low (no JPEG decoder, no raw-image buffer). The proxy rescales art
+# to the canvas size automatically (ddp_canvas auto-detects the widget size).
 #
 # Required vars:
 #   page_friendly_name: Name of the page (e.g., SendSpin)
@@ -21,11 +29,30 @@
 #     field. If the server only streams raw image bytes, nothing renders.
 #   - Requires the media proxy host to be able to fetch that URL (public
 #     provider CDNs like i.scdn.co / is1-ssl.mzstatic.com work fine).
+#   - 64x64 runs without PSRAM. Larger panels need PSRAM: the album-art canvas
+#     buffer is ART*ART*2 bytes (e.g. 256x256 rgb565 = 128 KB).
+#   - Portrait panels (H > W) use the square/overlay layout; space below the
+#     ART-sized art square stays black (not specially optimized).
 
 lvgl_page_manager:
   pages:
     - page: page_sendspin
       friendly_name: "${page_friendly_name}"
+
+# Layout geometry derived from the display size. Substitutions may reference
+# each other and use inline conditionals (Jinja), same as DISPLAY_W/DISPLAY_H.
+substitutions:
+  SS_ART: ${ DISPLAY_W if DISPLAY_W <= DISPLAY_H else DISPLAY_H }      # art square edge = min(W, H)
+  SS_FONT: ${ 'spleen_8' if DISPLAY_H <= 64 else 'spleen_16' }
+  SS_TEXT_H: ${ 10 if DISPLAY_H <= 64 else 18 }                       # text line height
+  SS_BAR_H: ${ 2 if DISPLAY_H <= 64 else 4 }                          # progress bar height
+  SS_ART_X: ${ (DISPLAY_W - DISPLAY_H) if DISPLAY_W > DISPLAY_H else 0 }
+  # Text region + progress bar share width/x: left column when wide, full art width when square.
+  SS_TEXT_W: ${ (DISPLAY_W - DISPLAY_H) if DISPLAY_W > DISPLAY_H else SS_ART }
+  SS_TEXT_Y: ${ 0 if DISPLAY_W > DISPLAY_H else (SS_ART - SS_BAR_H - SS_TEXT_H) }
+  SS_TEXT_BOX_H: ${ (DISPLAY_H - SS_BAR_H) if DISPLAY_W > DISPLAY_H else SS_TEXT_H }
+  SS_TEXT_OPA: ${ 'COVER' if DISPLAY_W > DISPLAY_H else '60%' }
+  SS_BAR_Y: ${ (DISPLAY_H - SS_BAR_H) if DISPLAY_W > DISPLAY_H else (SS_ART - SS_BAR_H) }
 
 sendspin:
   id: sendspin_hub
@@ -122,7 +149,7 @@ globals:
   - id: sendspin_art_src
     type: std::string
     restore_value: no
-    initial_value: '"internal:placeholder/64x64/000000.png"'
+    initial_value: '"internal:placeholder/${SS_ART}x${SS_ART}/000000.png"'
 
 # Bind a DDP stream ID to the LVGL canvas that will display the album art.
 ddp_canvas:
@@ -131,14 +158,14 @@ ddp_canvas:
     back_buffers: 0
 
 # Extend the shared mp_control (declared in packages/common/ddp.yaml) with
-# an output that feeds our DDP stream. Proxy fetches the URL, rescales to
-# 64x64 rgb565, and streams frames over UDP.
+# an output that feeds our DDP stream. Proxy fetches the URL, rescales to the
+# canvas size (SS_ART x SS_ART) rgb565, and streams frames over UDP.
 media_proxy_control:
   id: mp_control
   outputs:
     - id: sendspin_art_output
       stream: sendspin_art_stream
-      src: "internal:placeholder/64x64/000000.png"
+      src: "internal:placeholder/${SS_ART}x${SS_ART}/000000.png"
       loop: false
       format: rgb565
 
@@ -167,18 +194,18 @@ lvgl:
       widgets:
         - canvas:
             id: sendspin_art_canvas
-            x: 0
+            x: ${SS_ART_X}
             y: 0
-            width: 64
-            height: 64
+            width: ${SS_ART}
+            height: ${SS_ART}
 
         - obj:
             x: 0
-            y: 52
-            width: 64
-            height: 10
+            y: ${SS_TEXT_Y}
+            width: ${SS_TEXT_W}
+            height: ${SS_TEXT_BOX_H}
             bg_color: 0x000000
-            bg_opa: 60%
+            bg_opa: ${SS_TEXT_OPA}
             border_width: 0
             radius: 0
             scrollbar_mode: "OFF"
@@ -188,19 +215,19 @@ lvgl:
                   id: sendspin_now_playing_label
                   x: 0
                   y: 1
-                  width: 64
-                  height: 8
+                  width: ${SS_TEXT_W}
+                  height: ${SS_TEXT_H}
                   text: ""
                   text_color: 0xFFFFFF
-                  text_font: spleen_8
+                  text_font: ${SS_FONT}
                   long_mode: SCROLL_CIRCULAR
 
         - bar:
             id: sendspin_progress_bar
             x: 0
-            y: 62
-            width: 64
-            height: 2
+            y: ${SS_BAR_Y}
+            width: ${SS_TEXT_W}
+            height: ${SS_BAR_H}
             value: 0
             min_value: 0
             max_value: 100
