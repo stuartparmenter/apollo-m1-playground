@@ -79,7 +79,7 @@ sensor:
     lambda: |-
       #include "esp_heap_caps.h"
       // Bytes of free internal heap
-      return (float) heap_caps_get_free_size(MALLOC_CAP_8BIT | MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+      return (float) heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
     disabled_by_default: true
 
   - platform: template
