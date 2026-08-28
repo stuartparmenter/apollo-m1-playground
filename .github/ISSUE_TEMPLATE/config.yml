@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation (Wiki)
+    url: https://github.com/pavlov-net/hub75-studio/wiki
+    about: Installation, customization, page configs, and troubleshooting guides.
