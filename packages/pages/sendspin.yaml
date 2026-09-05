@@ -75,25 +75,8 @@ sensor:
     type: track_duration
     id: sendspin_track_duration
 
-number:
-  - platform: template
-    name: "SendSpin Scroll Speed"
-    id: sendspin_scroll_speed
-    icon: "mdi:speedometer"
-    entity_category: config
-    min_value: 1
-    max_value: 10
-    step: 1
-    initial_value: 5
-    optimistic: true
-    restore_value: true
-    on_value:
-      - lambda: |-
-          uint32_t anim_ms = (uint32_t)(11000 - x * 1000);
-          lv_obj_set_style_anim_time(id(sendspin_now_playing_label), anim_ms, LV_PART_MAIN);
-          // Force the running scroll animation to restart with the new speed
-          lv_label_set_long_mode(id(sendspin_now_playing_label), LV_LABEL_LONG_CLIP);
-          lv_label_set_long_mode(id(sendspin_now_playing_label), LV_LABEL_LONG_SCROLL_CIRCULAR);
+# Scroll speed comes from the shared "Scroll Speed" number in common/utils.yaml;
+# the subscription lives in the esphome: on_boot block below.
 
 # Poll track progress while playing and drive the progress bar.
 # Runs regardless of which page is active so the bar is ready on page switch.
@@ -149,6 +132,14 @@ esphome:
   on_boot:
     - priority: -100
       then:
+        - lambda: |-
+            // Slider moves on the shared Scroll Speed re-time the running scroll
+            id(shared_scroll_speed).add_on_state_callback([](float sp) {
+              uint32_t anim_ms = (uint32_t)(11000 - sp * 1000);
+              lv_obj_set_style_anim_time(id(sendspin_now_playing_label), anim_ms, LV_PART_MAIN);
+              lv_label_set_long_mode(id(sendspin_now_playing_label), LV_LABEL_LONG_CLIP);
+              lv_label_set_long_mode(id(sendspin_now_playing_label), LV_LABEL_LONG_SCROLL_CIRCULAR);
+            });
         - lambda: |-
             id(sendspin_hub).add_metadata_update_callback(
               [](const auto &m) {
@@ -214,5 +205,5 @@ lvgl:
         then:
           - lambda: |-
               id(sendspin_art_output).start();
-              uint32_t anim_ms = (uint32_t)(11000 - id(sendspin_scroll_speed).state * 1000);
+              uint32_t anim_ms = (uint32_t)(11000 - id(shared_scroll_speed).state * 1000);
               lv_obj_set_style_anim_time(id(sendspin_now_playing_label), anim_ms, LV_PART_MAIN);
