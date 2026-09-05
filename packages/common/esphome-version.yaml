@@ -1,6 +1,13 @@
 # © Copyright 2025 Stuart Parmenter
 # SPDX-License-Identifier: MIT
 
-# Enforce minimum ESPHome version
+# Enforce minimum ESPHome version and identify the project to clients
 esphome:
   min_version: 2026.7.0
+
+  # The .factory.yaml configs declare their own project block, which wins over
+  # this one, so release builds keep the version the publish workflow injects.
+  # Keep in sync with the version in pyproject.toml.
+  project:
+    name: pavlov-net.hub75-studio
+    version: "0.7.2"
