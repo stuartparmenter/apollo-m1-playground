@@ -52,6 +52,24 @@ globals:
     restore_value: no
     initial_value: '""'
 
+# Subscribe the ticker to the shared Scroll Speed (common/utils.yaml):
+# slider moves re-time the running scroll immediately.
+esphome:
+  on_boot:
+    - priority: -100.0
+      then:
+        - lambda: |-
+            id(shared_scroll_speed).add_on_state_callback([](float sp) {
+              const char *cur = lv_label_get_text(id(tt_game_status_lbl));
+              size_t len = cur ? strlen(cur) : 0;
+              uint32_t per = (uint32_t) (280 - sp * 26);
+              uint32_t anim_ms = (uint32_t) (len * per);
+              if (anim_ms < 3000) anim_ms = 3000;
+              lv_obj_set_style_anim_time(id(tt_game_status_lbl), anim_ms, LV_PART_MAIN);
+              lv_label_set_long_mode(id(tt_game_status_lbl), LV_LABEL_LONG_CLIP);
+              lv_label_set_long_mode(id(tt_game_status_lbl), LV_LABEL_LONG_SCROLL_CIRCULAR);
+            });
+
 script:
   - id: tt_hide_splash
     mode: restart
@@ -181,8 +199,10 @@ api:
             const char *cur = lv_label_get_text(id(tt_game_status_lbl));
             if (cur == nullptr || status_text != cur) {
               lv_label_set_text(id(tt_game_status_lbl), status_text.c_str());
-              uint32_t anim_ms = (uint32_t) (status_text.length() * 150);
-              if (anim_ms < 4000) anim_ms = 4000;
+              float sp = id(shared_scroll_speed).has_state() ? id(shared_scroll_speed).state : 5.0f;
+              uint32_t per = (uint32_t) (280 - sp * 26);
+              uint32_t anim_ms = (uint32_t) (status_text.length() * per);
+              if (anim_ms < 3000) anim_ms = 3000;
               lv_obj_set_style_anim_time(id(tt_game_status_lbl), anim_ms, LV_PART_MAIN);
             }
         - lambda: |-
