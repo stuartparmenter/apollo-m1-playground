@@ -29,6 +29,7 @@ button:
     name: "ESP Reboot"
     entity_category: "diagnostic"
 
+
 # Matrix display controls
 switch:
   - platform: template
@@ -47,6 +48,19 @@ switch:
           brightness: 0
 
 number:
+  # Shared scroll speed for pages with scrolling text (1 slow .. 10 fast).
+  # Pages map the value to their own animation timing.
+  - platform: template
+    name: "Scroll Speed"
+    id: shared_scroll_speed
+    icon: "mdi:speedometer"
+    entity_category: config
+    min_value: 1
+    max_value: 10
+    step: 1
+    initial_value: 5
+    optimistic: true
+    restore_value: true
   - platform: template
     name: "Brightness"
     id: brightness
